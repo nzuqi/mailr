@@ -1,8 +1,8 @@
-import { Response } from 'express';
+import { NextFunction, Response, Request } from 'express';
 import { ErrorCodes } from '../error-codes';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const errorHandler = (err: any, /*req: Request,*/ res: Response /*next: NextFunction*/) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
+export const errorHandler = (err: any, req: Request, res: Response, next: NextFunction) => {
   console.error('Error:', err);
 
   // Handle MongoDB duplicate key error
