@@ -11,7 +11,15 @@ const connectToDatabase = async (): Promise<void> => {
 
   const options: ConnectOptions = { autoIndex: true };
 
-  await mongoose.connect(MONGODB_URL, options);
+  await mongoose
+    .connect(MONGODB_URL, options)
+    .then(() => {
+      console.log('Connected to the database.');
+    })
+    .catch((err) => {
+      console.log('Cannot connect to the database: ', err);
+      process.exit();
+    });
 };
 
 export { connectToDatabase };

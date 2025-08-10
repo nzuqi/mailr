@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import crypto from 'crypto';
 
-import { User, UserInput } from '../models/user.model';
+import { User, UserInput } from '../models';
 
 const hashPassword = (password: string) => {
   const salt = crypto.randomBytes(16).toString('hex');

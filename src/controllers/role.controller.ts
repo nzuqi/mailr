@@ -1,70 +1,76 @@
 import { Request, Response } from 'express';
-import { Role, RoleInput } from '../models/role.model';
+import { Role, RoleInput } from '../models';
+import { asyncHandler, deleteHandler, ErrorCodes, HttpError } from '../utils';
 
-export const createRole = async (req: Request, res: Response) => {
-  const { description, name } = req.body;
+export const createRole = asyncHandler(async (req: Request, res: Response) => {
+  const { core, description, enabled, name, permissions } = req.body;
 
-  if (!name || !description) {
-    return res.status(422).json({
-      message: 'The fields name and description are required',
-    });
+  if (typeof name !== 'string' || typeof description !== 'string' || !Array.isArray(permissions) || permissions.length === 0) {
+    throw new HttpError(422, 'Name, description, and permissions are required and must be valid.', ErrorCodes.VALIDATION);
   }
 
   const roleInput: RoleInput = {
-    name,
-    description,
+    name: name.trim(),
+    description: description.trim(),
+    permissions,
+    core,
+    enabled,
   };
 
   const roleCreated = await Role.create(roleInput);
 
-  console.log(roleCreated);
+  return res.status(201).json({ data: roleCreated, message: 'Role created successfully' });
+});
 
-  return res.status(201).json({ data: roleCreated });
-};
-
-export const getAllRoles = async (req: Request, res: Response) => {
+export const getAllRoles = asyncHandler(async (req: Request, res: Response) => {
   const roles = await Role.find().sort('-createdAt').exec();
 
   return res.status(200).json({ data: roles });
-};
+});
 
-export const getRole = async (req: Request, res: Response) => {
+export const getRole = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
 
   const role = await Role.findOne({ _id: id });
 
   if (!role) {
-    return res.status(404).json({ message: `Role with id "${id}" not found.` });
+    throw new HttpError(404, `Role with id '${id}' not found.`, ErrorCodes.NOT_FOUND);
   }
 
   return res.status(200).json({ data: role });
-};
+});
 
-export const updateRole = async (req: Request, res: Response) => {
+export const updateRole = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { description, name } = req.body;
+  const { core, description, enabled, name, permissions } = req.body;
 
-  const role = await Role.findOne({ _id: id });
-
-  if (!role) {
-    return res.status(404).json({ message: `Role with id "${id}" not found.` });
+  if (typeof name !== 'string' || typeof description !== 'string' || !Array.isArray(permissions) || permissions.length === 0) {
+    throw new HttpError(422, 'Name, description, and permissions are required and must be valid.', ErrorCodes.VALIDATION);
   }
 
-  if (!name || !description) {
-    return res.status(422).json({ message: 'The fields name and description are required' });
+  const roleUpdated = await Role.findByIdAndUpdate(id, { name, description, permissions, core, enabled }, { new: true, runValidators: true });
+
+  if (!roleUpdated) {
+    throw new HttpError(404, `Role with id '${id}' not found.`, ErrorCodes.NOT_FOUND);
   }
 
-  await Role.updateOne({ _id: id }, { name, description });
+  return res.status(200).json({
+    data: roleUpdated,
+    message: 'Role updated successfully',
+  });
+});
 
-  const roleUpdated = await Role.findById(id, { name, description });
+export const deleteRole = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params; // single delete
+  const { ids } = req.body || {}; // bulk delete
 
-  return res.status(200).json({ data: roleUpdated });
-};
+  const result = await deleteHandler({
+    model: Role,
+    id,
+    ids,
+    resourceName: 'Role',
+    returnDeletedDocs: true,
+  });
 
-export const deleteRole = async (req: Request, res: Response) => {
-  const { id } = req.params;
-
-  await Role.findByIdAndDelete(id);
-
-  return res.status(200).json({ message: 'Role deleted successfully.' });
-};
+  return res.status(200).json(result);
+});
