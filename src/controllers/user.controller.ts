@@ -1,7 +1,9 @@
 import { Request, Response } from 'express';
 import crypto from 'crypto';
-import { User, UserInput } from '../models';
+import { Setting, SettingInput, User, UserInput } from '../models';
 import { asyncHandler, deleteHandler, ErrorCodes, HttpError } from '../utils';
+
+const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
 const hashPassword = (password: string) => {
   const salt = crypto.randomBytes(16).toString('hex');
@@ -10,11 +12,30 @@ const hashPassword = (password: string) => {
   return crypto.pbkdf2Sync(password, salt, 100, 64, `sha512`).toString(`hex`);
 };
 
-export const createUser = asyncHandler(async (req: Request, res: Response) => {
+export const registerUser = asyncHandler(async (req: Request, res: Response) => {
+  const setting: SettingInput | null = await Setting.findOne({ key: 'app' });
+  let signupAllowed = false;
+
+  try {
+    const _data = setting?.value ? JSON.parse(setting?.value) : {};
+
+    signupAllowed = _data?.signupAllowed;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  } catch (error) {
+    // Do nothing here
+  }
+  if (!signupAllowed) {
+    throw new HttpError(405, "Oops! We're not allowing new registrations for now", ErrorCodes.NOT_ALLOWED);
+  }
+
   const { email, name, password, role } = req.body;
 
   if (typeof name !== 'string' || typeof email !== 'string' || typeof password !== 'string' || typeof role !== 'string') {
     throw new HttpError(422, 'The fields email, name, password and role are required', ErrorCodes.VALIDATION);
+  }
+
+  if (!emailRegex.test(email)) {
+    throw new HttpError(422, 'Invalid email format', ErrorCodes.VALIDATION);
   }
 
   const userInput: UserInput = {
