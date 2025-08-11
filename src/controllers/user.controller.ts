@@ -69,8 +69,8 @@ export const getUser = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const deleteUser = async (req: Request, res: Response) => {
-  const { id } = req.params; // single delete
-  const { ids } = req.body || {}; // bulk delete
+  const { id } = req.params;
+  const { ids } = req.body || {};
 
   const result = await deleteHandler({
     model: User,
