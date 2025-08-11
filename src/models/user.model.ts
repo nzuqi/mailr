@@ -1,24 +1,24 @@
 import mongoose, { Schema, Model, Document } from 'mongoose';
 
 type UserDocument = Document & {
-  fullName: string;
+  name: string;
   email: string;
   password: string;
-  enabled: string;
+  enabled?: string;
   role: string;
 };
 
 type UserInput = {
-  fullName: UserDocument['fullName'];
+  name: UserDocument['name'];
   email: UserDocument['email'];
   password: UserDocument['password'];
-  enabled: UserDocument['enabled'];
+  enabled?: UserDocument['enabled'];
   role: UserDocument['role'];
 };
 
 const usersSchema = new Schema(
   {
-    fullName: {
+    name: {
       type: Schema.Types.String,
       required: true,
     },
@@ -33,7 +33,7 @@ const usersSchema = new Schema(
     },
     enabled: {
       type: Schema.Types.Boolean,
-      default: true,
+      default: false,
     },
     role: {
       type: Schema.Types.ObjectId,

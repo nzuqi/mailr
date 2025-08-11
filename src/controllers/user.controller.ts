@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import crypto from 'crypto';
-
 import { User, UserInput } from '../models';
+import { asyncHandler, deleteHandler, ErrorCodes, HttpError } from '../utils';
 
 const hashPassword = (password: string) => {
   const salt = crypto.randomBytes(16).toString('hex');
@@ -10,69 +10,54 @@ const hashPassword = (password: string) => {
   return crypto.pbkdf2Sync(password, salt, 100, 64, `sha512`).toString(`hex`);
 };
 
-export const createUser = async (req: Request, res: Response) => {
-  const { email, enabled, fullName, password, role } = req.body;
+export const createUser = asyncHandler(async (req: Request, res: Response) => {
+  const { email, name, password, role } = req.body;
 
-  if (!email || !fullName || !password || !role) {
-    return res.status(422).json({ message: 'The fields email, fullName, password and role are required' });
+  if (typeof name !== 'string' || typeof email !== 'string' || typeof password !== 'string' || typeof role !== 'string') {
+    throw new HttpError(422, 'The fields email, name, password and role are required', ErrorCodes.VALIDATION);
   }
 
   const userInput: UserInput = {
-    fullName,
+    name,
     email,
     password: hashPassword(password),
-    enabled,
     role,
   };
 
   const userCreated = await User.create(userInput);
 
-  return res.status(201).json({ data: userCreated });
-};
+  return res.status(201).json({ data: userCreated, message: 'User created successfully' });
+});
 
-export const getAllUsers = async (req: Request, res: Response) => {
+export const getAllUsers = asyncHandler(async (req: Request, res: Response) => {
   const users = await User.find().populate('role').sort('-createdAt').exec();
 
   return res.status(200).json({ data: users });
-};
+});
 
-export const getUser = async (req: Request, res: Response) => {
+export const getUser = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
 
   const user = await User.findOne({ _id: id }).populate('role').exec();
 
   if (!user) {
-    return res.status(404).json({ message: `User with id "${id}" not found.` });
+    throw new HttpError(404, `User with id '${id}' not found.`, ErrorCodes.NOT_FOUND);
   }
 
   return res.status(200).json({ data: user });
-};
-
-export const updateUser = async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const { enabled, fullName, role } = req.body;
-
-  const user = await User.findOne({ _id: id });
-
-  if (!user) {
-    return res.status(404).json({ message: `User with id "${id}" not found.` });
-  }
-
-  if (!fullName || !role) {
-    return res.status(422).json({ message: 'The fields fullName and role are required' });
-  }
-
-  await User.updateOne({ _id: id }, { enabled, fullName, role });
-
-  const userUpdated = await User.findById(id);
-
-  return res.status(200).json({ data: userUpdated });
-};
+});
 
 export const deleteUser = async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const { id } = req.params; // single delete
+  const { ids } = req.body || {}; // bulk delete
 
-  await User.findByIdAndDelete(id);
+  const result = await deleteHandler({
+    model: User,
+    id,
+    ids,
+    resourceName: 'User',
+    returnDeletedDocs: true,
+  });
 
-  return res.status(200).json({ message: 'User deleted successfully.' });
+  return res.status(200).json(result);
 };
