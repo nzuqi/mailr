@@ -1,5 +1,15 @@
 import { Router } from 'express';
-import { registerUser, deleteUser, getAllUsers, getUser, signinUser, signoutUser, verifyEmailUser, resendVerificationUser } from '../controllers';
+import {
+  registerUser,
+  deleteUser,
+  getAllUsers,
+  getUser,
+  signinUser,
+  signoutUser,
+  verifyEmailUser,
+  resendVerificationUser,
+  refreshTokenUser,
+} from '../controllers';
 import { authenticate } from '../utils';
 
 export const userRoutes = () => {
@@ -22,6 +32,8 @@ export const userRoutes = () => {
   router.post('/v1/verify-email', verifyEmailUser);
 
   router.post('/v1/resend-verification', resendVerificationUser);
+
+  router.post('/v1/refresh-token', refreshTokenUser);
 
   return router;
 };

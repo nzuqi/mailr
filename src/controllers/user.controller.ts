@@ -158,6 +158,58 @@ export const signoutUser = asyncHandler(async (req: Request, res: Response) => {
   return res.status(200).json({ message: 'Signed out successfully' });
 });
 
+export const refreshTokenUser = asyncHandler(async (req: Request, res: Response) => {
+  const { refreshToken } = req.body;
+
+  if (!refreshToken || typeof refreshToken !== 'string') {
+    throw new HttpError(400, 'Refresh token is required', ErrorCodes.VALIDATION);
+  }
+
+  const jwtSecret = process.env.JWT_SECRET || '';
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let decoded: any;
+
+  try {
+    decoded = jwt.verify(refreshToken, jwtSecret);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  } catch (err) {
+    throw new HttpError(401, 'Invalid or expired refresh token', ErrorCodes.UNAUTHORIZED);
+  }
+
+  // Find user with matching refreshToken
+  const user = await User.findOne({ _id: decoded.id, refreshToken, emailVerified: true }).populate('role').exec();
+
+  if (!user) {
+    throw new HttpError(401, 'Invalid refresh token', ErrorCodes.UNAUTHORIZED);
+  }
+
+  if (!user.enabled) {
+    throw new HttpError(403, 'Account disabled', ErrorCodes.ACCOUNT_DISABLED);
+  }
+
+  // Generate new tokens
+  const newAccessToken = jwt.sign({ id: user._id }, jwtSecret, { expiresIn: '1h' });
+  const newRefreshToken = jwt.sign({ id: user._id }, jwtSecret, { expiresIn: '7d' });
+
+  // Update tokens in DB
+  user.accessToken = newAccessToken;
+  user.refreshToken = newRefreshToken;
+  await user.save();
+
+  return res.status(200).json({
+    accessToken: newAccessToken,
+    refreshToken: newRefreshToken,
+    user: {
+      id: user._id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+    },
+    message: 'Token refreshed successfully',
+  });
+});
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const verifyEmailUser = asyncHandler(async (req: Request, res: Response) => {
   // TODO; Logic here
