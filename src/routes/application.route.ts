@@ -1,20 +1,23 @@
 import { Router } from 'express';
-import { createApplication, deleteApplication, getAllApplications, getApplication, updateApplication } from '../controllers';
+import { createApplication, deleteApplication, generateApplicationKey, getAllApplications, getApplication, updateApplication } from '../controllers';
+import { authenticate } from '../utils';
 
 export const applicationRoutes = () => {
   const router = Router();
 
-  router.post('/v1/applications', createApplication);
+  router.post('/v1/applications', authenticate(), createApplication);
 
-  router.get('/v1/applications', getAllApplications);
+  router.get('/v1/applications', authenticate(['ADMIN']), getAllApplications);
 
-  router.get('/v1/applications/:id', getApplication);
+  router.get('/v1/applications/:id', authenticate(), getApplication);
 
-  router.put('/v1/applications/:id', updateApplication);
+  router.put('/v1/applications/:id', authenticate(['ADMIN']), updateApplication);
 
-  router.delete('/v1/applications/:id', deleteApplication);
+  router.delete('/v1/applications/:id', authenticate(['ADMIN']), deleteApplication);
 
-  router.delete('/v1/applications', deleteApplication);
+  router.delete('/v1/applications', authenticate(['ADMIN']), deleteApplication);
+
+  router.post('/v1/generate-key/:id', authenticate(), generateApplicationKey);
 
   return router;
 };

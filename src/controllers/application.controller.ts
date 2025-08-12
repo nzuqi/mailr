@@ -1,9 +1,9 @@
 import { Request, Response } from 'express';
 import { Application, ApplicationInput } from '../models';
-import { asyncHandler, deleteHandler, ErrorCodes, HttpError } from '../utils';
+import { asyncHandler, deleteHandler, ErrorCodes, generateRandomString, HttpError } from '../utils';
 
 export const createApplication = asyncHandler(async (req: Request, res: Response) => {
-  const { description, name, user } = req.body;
+  const { description, name, user } = req.body || {};
 
   if (typeof name !== 'string' || typeof description !== 'string' || typeof user !== 'string') {
     throw new HttpError(422, 'Name, description, and user are required and must be valid.', ErrorCodes.VALIDATION);
@@ -39,8 +39,8 @@ export const getApplication = asyncHandler(async (req: Request, res: Response) =
 });
 
 export const updateApplication = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const { description, name } = req.body;
+  const { id } = req.params || {};
+  const { description, name } = req.body || {};
 
   if (typeof name !== 'string' || typeof description !== 'string') {
     throw new HttpError(422, 'Name, description, and user are required and must be valid.', ErrorCodes.VALIDATION);
@@ -71,4 +71,23 @@ export const deleteApplication = asyncHandler(async (req: Request, res: Response
   });
 
   return res.status(200).json(result);
+});
+
+export const generateApplicationKey = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params || {};
+
+  const apiKey: string = generateRandomString(50, true);
+
+  const applicationUpdated = await Application.findByIdAndUpdate(id, { apiKey }, { new: true, runValidators: true });
+
+  if (!applicationUpdated) {
+    throw new HttpError(404, `Application with id '${id}' not found.`, ErrorCodes.NOT_FOUND);
+  }
+
+  return res.status(200).json({
+    data: {
+      apiKey: applicationUpdated.apiKey,
+    },
+    message: 'Application API key generated successfully',
+  });
 });

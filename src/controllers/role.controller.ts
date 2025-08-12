@@ -3,7 +3,7 @@ import { Role, RoleInput } from '../models';
 import { asyncHandler, deleteHandler, ErrorCodes, HttpError } from '../utils';
 
 export const createRole = asyncHandler(async (req: Request, res: Response) => {
-  const { core, description, enabled, name, permissions } = req.body;
+  const { core, description, enabled, name, permissions } = req.body || {};
 
   if (typeof name !== 'string' || typeof description !== 'string' || !Array.isArray(permissions) || permissions.length === 0) {
     throw new HttpError(422, 'Name, description, and permissions are required and must be valid.', ErrorCodes.VALIDATION);
@@ -42,7 +42,7 @@ export const getRole = asyncHandler(async (req: Request, res: Response) => {
 
 export const updateRole = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { core, description, enabled, name, permissions } = req.body;
+  const { core, description, enabled, name, permissions } = req.body || {};
 
   if (typeof name !== 'string' || typeof description !== 'string' || !Array.isArray(permissions) || permissions.length === 0) {
     throw new HttpError(422, 'Name, description, and permissions are required and must be valid.', ErrorCodes.VALIDATION);

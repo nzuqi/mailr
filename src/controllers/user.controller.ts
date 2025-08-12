@@ -25,7 +25,7 @@ export const registerUser = asyncHandler(async (req: Request, res: Response) => 
     throw new HttpError(405, "Oops! We're not allowing new registrations for now", ErrorCodes.NOT_ALLOWED);
   }
 
-  const { email, firstName, lastName, password, role } = req.body;
+  const { email, firstName, lastName, password, role } = req.body || {};
 
   if (
     typeof firstName !== 'string' ||
@@ -82,7 +82,7 @@ export const getUser = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const signinUser = asyncHandler(async (req: Request, res: Response) => {
-  const { email, password } = req.body;
+  const { email, password } = req.body || {};
 
   if (typeof email !== 'string' || typeof password !== 'string') {
     throw new HttpError(422, 'Email and password are required', ErrorCodes.VALIDATION);
@@ -159,7 +159,7 @@ export const signoutUser = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const refreshTokenUser = asyncHandler(async (req: Request, res: Response) => {
-  const { refreshToken } = req.body;
+  const { refreshToken } = req.body || {};
 
   if (!refreshToken || typeof refreshToken !== 'string') {
     throw new HttpError(400, 'Refresh token is required', ErrorCodes.VALIDATION);
@@ -221,7 +221,7 @@ export const resendVerificationUser = asyncHandler(async (req: Request, res: Res
 });
 
 export const deleteUser = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const { id } = req.params || {};
   const { ids } = req.body || {};
 
   const result = await deleteHandler({
