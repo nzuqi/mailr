@@ -1,49 +1,45 @@
 import { Request, Response } from 'express';
-import crypto from 'crypto';
 import { Setting, SettingInput, User, UserInput } from '../models';
-import { asyncHandler, deleteHandler, emailRegex, ErrorCodes, HttpError } from '../utils';
-
-const hashPassword = (password: string) => {
-  const salt = crypto.randomBytes(16).toString('hex');
-
-  // Hashing salt and password with 100 iterations, 64 length and sha512 digest
-  return crypto.pbkdf2Sync(password, salt, 100, 64, `sha512`).toString(`hex`);
-};
+import { asyncHandler, capitalizeFirstLetter, deleteHandler, emailRegex, ErrorCodes, generateRandomString, hashPassword, HttpError } from '../utils';
 
 export const registerUser = asyncHandler(async (req: Request, res: Response) => {
   const setting: SettingInput | null = await Setting.findOne({ key: 'app' });
   let signupAllowed = false;
+  const _data = setting?.value ? JSON.parse(setting?.value) : {};
+  signupAllowed = _data?.signupAllowed;
 
-  try {
-    const _data = setting?.value ? JSON.parse(setting?.value) : {};
-
-    signupAllowed = _data?.signupAllowed;
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  } catch (error) {
-    // Do nothing here
-  }
   if (!signupAllowed) {
     throw new HttpError(405, "Oops! We're not allowing new registrations for now", ErrorCodes.NOT_ALLOWED);
   }
 
-  const { email, name, password, role } = req.body;
+  const { email, firstName, lastName, password, role } = req.body;
 
-  if (typeof name !== 'string' || typeof email !== 'string' || typeof password !== 'string' || typeof role !== 'string') {
-    throw new HttpError(422, 'The fields email, name, password and role are required', ErrorCodes.VALIDATION);
+  if (typeof firstName !== 'string' || typeof lastName !== 'string' || typeof email !== 'string' || typeof password !== 'string' || typeof role !== 'string') {
+    throw new HttpError(422, 'The fields email, firstName, firstName, password and role are required', ErrorCodes.VALIDATION);
   }
 
   if (!emailRegex.test(email)) {
     throw new HttpError(422, 'Invalid email format', ErrorCodes.VALIDATION);
   }
 
+  const verificationCode = generateRandomString(20);
+  const current = new Date();
+  const expires = current.getTime() + 86400000;// + 1 day in ms
+
   const userInput: UserInput = {
-    name,
-    email,
+    name: `${capitalizeFirstLetter(firstName)} ${capitalizeFirstLetter(lastName)}`,
+    email: email.toLowerCase(),
     password: hashPassword(password),
     role,
+    verificationInfo: {
+      email: verificationCode,
+      expires
+    }
   };
 
   const userCreated = await User.create(userInput);
+
+  // TODO: Send verification email
 
   return res.status(201).json({ data: userCreated, message: 'User created successfully' });
 });
@@ -66,7 +62,23 @@ export const getUser = asyncHandler(async (req: Request, res: Response) => {
   return res.status(200).json({ data: user });
 });
 
-export const deleteUser = async (req: Request, res: Response) => {
+export const signinUser = asyncHandler(async (req: Request, res: Response) => {
+  // TODO; Logic here
+});
+
+export const signoutUser = asyncHandler(async (req: Request, res: Response) => {
+  // TODO; Logic here
+});
+
+export const verifyEmailUser = asyncHandler(async (req: Request, res: Response) => {
+  // TODO; Logic here
+});
+
+export const resendVerificationUser = asyncHandler(async (req: Request, res: Response) => {
+  // TODO; Logic here
+});
+
+export const deleteUser = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
   const { ids } = req.body || {};
 
@@ -79,4 +91,4 @@ export const deleteUser = async (req: Request, res: Response) => {
   });
 
   return res.status(200).json(result);
-};
+});

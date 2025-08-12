@@ -4,16 +4,21 @@ type UserDocument = Document & {
   name: string;
   email: string;
   password: string;
-  enabled?: string;
+  emailVerified?: boolean;
+  verificationInfo?: Record<string, string | number | boolean> | null;
+  accessToken?: string | null;
+  refreshToken?: string | null;
+  passwordResetInfo?: Record<string, string | number | boolean> | null;
+  enabled?: boolean;
   role: string;
 };
 
 type UserInput = {
-  name: UserDocument['name'];
+  name: string;
   email: UserDocument['email'];
   password: UserDocument['password'];
-  enabled?: UserDocument['enabled'];
   role: UserDocument['role'];
+  verificationInfo?: UserDocument['verificationInfo'];
 };
 
 const usersSchema = new Schema(
@@ -31,9 +36,29 @@ const usersSchema = new Schema(
       type: Schema.Types.String,
       required: true,
     },
-    enabled: {
+    emailVerified: {
       type: Schema.Types.Boolean,
       default: false,
+    },
+    verificationInfo: {
+      type: Schema.Types.Map,
+      default: null,
+    },
+    accessToken: {
+      type: Schema.Types.String,
+      default: null,
+    },
+    refreshToken: {
+      type: Schema.Types.String,
+      default: null,
+    },
+    passwordResetInfo: {
+      type: Schema.Types.Map,
+      default: null,
+    },
+    enabled: {
+      type: Schema.Types.Boolean,
+      default: true,
     },
     role: {
       type: Schema.Types.ObjectId,
