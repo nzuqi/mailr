@@ -1,9 +1,7 @@
 import { Request, Response } from 'express';
 import crypto from 'crypto';
 import { Setting, SettingInput, User, UserInput } from '../models';
-import { asyncHandler, deleteHandler, ErrorCodes, HttpError } from '../utils';
-
-const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+import { asyncHandler, deleteHandler, emailRegex, ErrorCodes, HttpError } from '../utils';
 
 const hashPassword = (password: string) => {
   const salt = crypto.randomBytes(16).toString('hex');
