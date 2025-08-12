@@ -37,7 +37,7 @@ export const authenticate = (allowedRoles?: RoleType) => async (req: Request, re
     // Role-based access control
     if (allowedRoles) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { role } = user;
+      const { role }: any = user;
       const userRoleName = typeof user.role === 'object' && role?.name ? role?.name : String(user.role);
 
       const allowedRolesArray = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
