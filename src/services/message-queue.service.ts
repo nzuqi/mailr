@@ -32,7 +32,7 @@ export const processQueuedMessages = async () => {
           throw new Error(`SMTP configuration missing for application ${msg.application}`);
         }
 
-        const smtpConfig: SmtpData = application.smtp;
+        const smtpConfig: SmtpData = application.smtp instanceof Map ? Object.fromEntries(application.smtp) : application.smtp || {};
 
         // Create Nodemailer transport for this application
         const transporter = nodemailer.createTransport({
@@ -46,7 +46,7 @@ export const processQueuedMessages = async () => {
         });
 
         await transporter.sendMail({
-          from: `"${msg.from.name}" <${msg.from.email}>`,
+          from: `"${msg.from}" <${smtpConfig.user}>`,
           to: msg.to.join(', '),
           subject: msg.subject,
           text: msg.message,

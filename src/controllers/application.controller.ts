@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { Application, ApplicationInput, UserDocument } from '../models';
+import { Application, ApplicationInput, SmtpData, UserDocument } from '../models';
 import { asyncHandler, deleteHandler, ErrorCodes, generateRandomString, HttpError } from '../utils';
 
 export const createApplication = asyncHandler(async (req: Request, res: Response) => {
@@ -41,13 +41,18 @@ export const getApplication = asyncHandler(async (req: Request, res: Response) =
 
 export const updateApplication = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params || {};
-  const { description, name } = req.body || {};
+  const { description, enabled } = req.body || {};
 
-  if (typeof name !== 'string' || typeof description !== 'string') {
-    throw new HttpError(422, 'Name, description, and user are required and must be valid.', ErrorCodes.VALIDATION);
+  if ((description && typeof description !== 'string') || (enabled && typeof enabled !== 'boolean')) {
+    throw new HttpError(422, `You can only update using 'description' and 'enabled' fields`, ErrorCodes.VALIDATION);
   }
 
-  const applicationUpdated = await Application.findByIdAndUpdate(id, { name, description }, { new: true, runValidators: true });
+  const updateData: { description: string; enabled?: boolean } = { description };
+
+  if (typeof enabled === 'boolean') {
+    updateData.enabled = enabled;
+  }
+  const applicationUpdated = await Application.findByIdAndUpdate(id, updateData, { new: true, runValidators: true });
 
   if (!applicationUpdated) {
     throw new HttpError(404, `Application with id '${id}' not found.`, ErrorCodes.NOT_FOUND);
@@ -90,5 +95,26 @@ export const generateApplicationKey = asyncHandler(async (req: Request, res: Res
       apiKey: applicationUpdated.apiKey,
     },
     message: 'Application API key generated successfully',
+  });
+});
+
+export const updateApplicationSmtp = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params || {};
+  const { host, password, port, secure, user } = req.body || {};
+
+  if (typeof host !== 'string' || typeof port !== 'number' || typeof user !== 'string' || typeof password !== 'string') {
+    throw new HttpError(422, 'Host, port, user and password are required and must be valid.', ErrorCodes.VALIDATION);
+  }
+
+  const smtp: SmtpData = { host, port, secure: typeof secure === 'boolean' ? secure : false, user, password };
+  const applicationUpdated = await Application.findByIdAndUpdate(id, { smtp }, { new: true, runValidators: true });
+
+  if (!applicationUpdated) {
+    throw new HttpError(404, `Application with id '${id}' not found.`, ErrorCodes.NOT_FOUND);
+  }
+
+  return res.status(200).json({
+    data: applicationUpdated,
+    message: 'Application updated successfully',
   });
 });

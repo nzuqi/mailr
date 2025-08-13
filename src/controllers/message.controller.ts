@@ -7,20 +7,14 @@ export const queueMessage = asyncHandler(async (req: Request, res: Response) => 
   const user: UserDocument = res.locals.user || {};
 
   if (
-    typeof from !== 'object' ||
-    typeof from?.name !== 'string' ||
-    typeof from?.email !== 'string' ||
+    typeof from !== 'string' ||
     !Array.isArray(to) ||
     to.length === 0 ||
     typeof subject !== 'string' ||
     typeof message !== 'string' ||
     typeof key !== 'string'
   ) {
-    throw new HttpError(422, 'From (name and email), to, subject, message and key are required and must be valid.', ErrorCodes.VALIDATION);
-  }
-
-  if (!emailRegex.test(from?.email)) {
-    throw new HttpError(422, `Invalid sender email format: ${from?.email}`, ErrorCodes.VALIDATION);
+    throw new HttpError(422, 'From (sender name), to, subject, message and key are required and must be valid.', ErrorCodes.VALIDATION);
   }
 
   const recipients: string[] = to.map((email: string) => email.toLowerCase());
@@ -37,10 +31,7 @@ export const queueMessage = asyncHandler(async (req: Request, res: Response) => 
   }
 
   const messageInput: MessageInput = {
-    from: {
-      name: from?.name,
-      email: (from?.email || '').toLowerCase(),
-    },
+    from,
     to: recipients,
     subject: subject.trim(),
     message: message.trim(),

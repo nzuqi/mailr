@@ -1,5 +1,13 @@
 import { Router } from 'express';
-import { createApplication, deleteApplication, generateApplicationKey, getAllApplications, getApplication, updateApplication } from '../controllers';
+import {
+  createApplication,
+  deleteApplication,
+  generateApplicationKey,
+  getAllApplications,
+  getApplication,
+  updateApplication,
+  updateApplicationSmtp,
+} from '../controllers';
 import { authenticate } from '../utils';
 
 export const applicationRoutes = () => {
@@ -12,6 +20,8 @@ export const applicationRoutes = () => {
   router.get('/v1/applications/:id', authenticate(), getApplication);
 
   router.put('/v1/applications/:id', authenticate(['ADMIN']), updateApplication);
+
+  router.put('/v1/applications/:id/smtp', authenticate(['ADMIN']), updateApplicationSmtp);
 
   router.delete('/v1/applications/:id', authenticate(['ADMIN']), deleteApplication);
 

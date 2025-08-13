@@ -1,12 +1,7 @@
 import mongoose, { Schema, Model, Document } from 'mongoose';
 
-type FromUser = {
-  name: string;
-  email: string;
-};
-
 type MessageDocument = Document & {
-  from: FromUser;
+  from: string;
   to: string[];
   subject: string;
   message: string;
@@ -33,7 +28,7 @@ type MessageInput = {
 const messageSchema = new Schema(
   {
     from: {
-      type: Schema.Types.Map,
+      type: Schema.Types.String,
       required: true,
     },
     to: {
