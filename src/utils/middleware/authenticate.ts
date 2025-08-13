@@ -47,10 +47,7 @@ export const authenticate = (allowedRoles?: RoleType) => async (req: Request, re
       }
     }
 
-    // Attach user to request for downstream handlers
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (req as any).user = user;
-
+    res.locals.user = user;
     next();
   } catch (err) {
     next(err);

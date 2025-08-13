@@ -1,18 +1,19 @@
 import { Request, Response } from 'express';
-import { Application, ApplicationInput } from '../models';
+import { Application, ApplicationInput, UserDocument } from '../models';
 import { asyncHandler, deleteHandler, ErrorCodes, generateRandomString, HttpError } from '../utils';
 
 export const createApplication = asyncHandler(async (req: Request, res: Response) => {
-  const { description, name, user } = req.body || {};
+  const { description, name } = req.body || {};
+  const user: UserDocument = res.locals.user || {};
 
-  if (typeof name !== 'string' || typeof description !== 'string' || typeof user !== 'string') {
+  if (typeof name !== 'string' || typeof description !== 'string') {
     throw new HttpError(422, 'Name, description, and user are required and must be valid.', ErrorCodes.VALIDATION);
   }
 
   const applicationInput: ApplicationInput = {
     name: name.trim(),
     description: description.trim(),
-    user: user.trim(),
+    user: (user._id || '').toString(),
   };
 
   const applicationCreated = await Application.create(applicationInput);
