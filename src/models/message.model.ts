@@ -14,6 +14,9 @@ type MessageDocument = Document & {
   user: string;
   status: number; // 0: Queued, 1: Sent, 2: Failed
   urgent: boolean;
+  sentAt?: Date;
+  retryCount?: number;
+  error?: string;
 };
 
 type MessageInput = {
@@ -63,6 +66,18 @@ const messageSchema = new Schema(
     urgent: {
       type: Schema.Types.Boolean,
       default: false,
+    },
+    sentAt: {
+      type: Schema.Types.Date,
+      default: null,
+    },
+    error: {
+      type: Schema.Types.String,
+      default: null,
+    },
+    retryCount: {
+      type: Schema.Types.Number,
+      default: 0,
     },
   },
   {

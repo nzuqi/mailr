@@ -2,6 +2,7 @@ import express from 'express';
 import { connectToDatabase } from './db-connection';
 import { errorHandler } from './utils/middleware/error-handler';
 import routes from './routes';
+import { logger, startMessageProcessor } from './utils';
 
 const HOST = process.env.HOST || 'http://localhost';
 const PORT = parseInt(process.env.PORT || '4500');
@@ -21,6 +22,6 @@ app.use(errorHandler);
 
 app.listen(PORT, async () => {
   await connectToDatabase();
-
-  console.log(`Mailr is running on ${HOST}:${PORT} 🚀`);
+  logger.info(`🚀 Mailr is running on ${HOST}:${PORT}`);
+  startMessageProcessor();
 });

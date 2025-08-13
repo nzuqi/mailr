@@ -1,4 +1,5 @@
 import mongoose, { ConnectOptions } from 'mongoose';
+import { logger } from './utils';
 
 mongoose.Promise = global.Promise;
 
@@ -14,10 +15,10 @@ const connectToDatabase = async (): Promise<void> => {
   await mongoose
     .connect(MONGODB_URL, options)
     .then(() => {
-      console.log('Connected to the database.');
+      logger.info(`🚀 Connected to the database.`);
     })
     .catch((err) => {
-      console.log('Cannot connect to the database: ', err);
+      logger.error(`❌ Cannot connect to the database: ${err}`);
       process.exit();
     });
 };

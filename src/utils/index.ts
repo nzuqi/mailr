@@ -4,3 +4,5 @@ export * from './http-error';
 export * from './error-codes';
 export * from './delete-handler';
 export * from './common';
+export * from './logger';
+export * from './message-processor';

@@ -1,11 +1,20 @@
 import mongoose, { Schema, Model, Document } from 'mongoose';
 
+export type SmtpData = {
+  host: string;
+  port: number;
+  secure: boolean;
+  user: string;
+  password: string;
+};
+
 type ApplicationDocument = Document & {
   name: string;
   description: string | null;
   apiKey?: string | null;
   user: string;
   enabled?: boolean;
+  smtp?: SmtpData;
 };
 
 type ApplicationInput = {
@@ -14,6 +23,7 @@ type ApplicationInput = {
   apiKey?: ApplicationDocument['apiKey'];
   user: ApplicationDocument['user'];
   enabled?: ApplicationDocument['enabled'];
+  smtp?: ApplicationDocument['smtp'];
 };
 
 const applicationSchema = new Schema(
@@ -36,6 +46,10 @@ const applicationSchema = new Schema(
       ref: 'User',
       required: true,
       index: true,
+    },
+    smtp: {
+      type: Schema.Types.Map,
+      default: null,
     },
     enabled: {
       type: Schema.Types.Boolean,
