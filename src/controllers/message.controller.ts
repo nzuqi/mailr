@@ -44,3 +44,9 @@ export const queueMessage = asyncHandler(async (req: Request, res: Response) => 
 
   return res.status(201).json({ data: messageQueued, message: 'Message queued successfully' });
 });
+
+export const getAllMessages = asyncHandler(async (req: Request, res: Response) => {
+  const messages = await Message.find().sort('-createdAt').exec();
+
+  return res.status(200).json({ data: messages });
+});
