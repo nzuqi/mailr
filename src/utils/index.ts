@@ -6,3 +6,4 @@ export * from './delete-handler';
 export * from './common';
 export * from './logger';
 export * from './message-processor';
+export * from './html-to-text';

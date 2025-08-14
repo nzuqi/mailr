@@ -1,7 +1,7 @@
 import nodemailer from 'nodemailer';
 import { Application, Message, SmtpData } from '../models';
 import { MessageDocument } from '../models/message.model';
-import { logger } from '../utils';
+import { htmlToText, logger } from '../utils';
 
 const MAX_RETRIES = 3;
 const PROCESS_LIMIT = 10;
@@ -49,8 +49,8 @@ export const processQueuedMessages = async () => {
           from: `"${msg.from}" <${smtpConfig.user}>`,
           to: msg.to.join(', '),
           subject: msg.subject,
-          text: msg.message,
-          html: `<p>${msg.message}</p>`,
+          text: htmlToText(msg.message),
+          html: msg.message,
         });
 
         msg.status = 1;
