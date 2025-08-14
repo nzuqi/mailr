@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { Setting, SettingInput } from '../models';
-import { asyncHandler, ErrorCodes, HttpError } from '../utils';
+import { asyncHandler, ErrorCodes, HttpError, responseHandler } from '../utils';
 
 export const getAllSettings = asyncHandler(async (req: Request, res: Response) => {
   const settings = await Setting.find().sort('-createdAt').exec();
@@ -9,7 +9,7 @@ export const getAllSettings = asyncHandler(async (req: Request, res: Response) =
 
   settings.forEach((s: SettingInput) => (data[s.key] = s.value ? JSON.parse(s.value) : {}));
 
-  return res.status(200).json({ data });
+  return responseHandler(res.status(200), { data });
 });
 
 export const updateSettings = asyncHandler(async (req: Request, res: Response) => {
@@ -31,7 +31,7 @@ export const updateSettings = asyncHandler(async (req: Request, res: Response) =
 
   await Setting.updateOne(query, update, options);
 
-  return res.status(200).json({
+  return responseHandler(res.status(200), {
     data: { [key]: data },
     message: 'Settings updated successfully',
   });

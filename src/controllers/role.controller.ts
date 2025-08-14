@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { Role, RoleInput } from '../models';
-import { asyncHandler, deleteHandler, ErrorCodes, HttpError } from '../utils';
+import { asyncHandler, buildQueryOptions, deleteHandler, ErrorCodes, HttpError, responseHandler } from '../utils';
 
 export const createRole = asyncHandler(async (req: Request, res: Response) => {
   const { core, description, enabled, name, permissions } = req.body || {};
@@ -19,13 +19,37 @@ export const createRole = asyncHandler(async (req: Request, res: Response) => {
 
   const roleCreated = await Role.create(roleInput);
 
-  return res.status(201).json({ data: roleCreated, message: 'Role created successfully' });
+  return responseHandler(res.status(201), { data: roleCreated, message: 'Role created successfully' }, [
+    'name',
+    'description',
+    'permissions',
+    'core',
+    'enabled',
+    'createdAt',
+    'updatedAt',
+  ]);
 });
 
 export const getAllRoles = asyncHandler(async (req: Request, res: Response) => {
-  const roles = await Role.find().sort('-createdAt').exec();
+  const { filter, pagination, sort } = buildQueryOptions(req, ['name', 'description', 'createdAt', 'updatedAt']);
 
-  return res.status(200).json({ data: roles });
+  const [data, total] = await Promise.all([
+    Role.find(filter).sort(sort).skip(pagination.skip).limit(pagination.limit).exec(),
+    Role.countDocuments(filter),
+  ]);
+
+  return responseHandler(
+    res.status(200),
+    {
+      page: pagination.page,
+      limit: pagination.limit,
+      total,
+      totalPages: Math.ceil(total / pagination.limit),
+      data,
+      message: 'Successful',
+    },
+    ['name', 'description', 'permissions', 'core', 'enabled', 'createdAt', 'updatedAt'],
+  );
 });
 
 export const getRole = asyncHandler(async (req: Request, res: Response) => {
@@ -37,7 +61,7 @@ export const getRole = asyncHandler(async (req: Request, res: Response) => {
     throw new HttpError(404, `Role with id '${id}' not found.`, ErrorCodes.NOT_FOUND);
   }
 
-  return res.status(200).json({ data: role });
+  return responseHandler(res.status(200), { data: role }, ['name', 'description', 'permissions', 'core', 'enabled', 'createdAt', 'updatedAt']);
 });
 
 export const updateRole = asyncHandler(async (req: Request, res: Response) => {
@@ -54,10 +78,14 @@ export const updateRole = asyncHandler(async (req: Request, res: Response) => {
     throw new HttpError(404, `Role with id '${id}' not found.`, ErrorCodes.NOT_FOUND);
   }
 
-  return res.status(200).json({
-    data: roleUpdated,
-    message: 'Role updated successfully',
-  });
+  return responseHandler(
+    res.status(200),
+    {
+      data: roleUpdated,
+      message: 'Role updated successfully',
+    },
+    ['name', 'description', 'permissions', 'core', 'enabled', 'createdAt', 'updatedAt'],
+  );
 });
 
 export const deleteRole = asyncHandler(async (req: Request, res: Response) => {
@@ -72,5 +100,5 @@ export const deleteRole = asyncHandler(async (req: Request, res: Response) => {
     returnDeletedDocs: true,
   });
 
-  return res.status(200).json(result);
+  return responseHandler(res.status(200), result, ['name', 'description', 'permissions', 'core', 'enabled', 'createdAt', 'updatedAt']);
 });

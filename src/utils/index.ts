@@ -7,3 +7,5 @@ export * from './common';
 export * from './logger';
 export * from './message-processor';
 export * from './html-to-text';
+export * from './build-query-options';
+export * from './response-handler';

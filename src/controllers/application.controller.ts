@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { Application, ApplicationInput, SmtpData, UserDocument } from '../models';
-import { asyncHandler, deleteHandler, ErrorCodes, generateRandomString, HttpError } from '../utils';
+import { asyncHandler, buildQueryOptions, deleteHandler, ErrorCodes, generateRandomString, HttpError, responseHandler } from '../utils';
 
 export const createApplication = asyncHandler(async (req: Request, res: Response) => {
   const { description, name } = req.body || {};
@@ -18,13 +18,29 @@ export const createApplication = asyncHandler(async (req: Request, res: Response
 
   const applicationCreated = await Application.create(applicationInput);
 
-  return res.status(201).json({ data: applicationCreated, message: 'Application created successfully' });
+  return responseHandler(res.status(201), { data: applicationCreated, message: 'Application created successfully' }, ['name', 'description']);
 });
 
 export const getAllApplications = asyncHandler(async (req: Request, res: Response) => {
-  const applications = await Application.find().sort('-createdAt').exec();
+  const { filter, pagination, sort } = buildQueryOptions(req, ['name', 'description', 'createdAt', 'updatedAt']);
 
-  return res.status(200).json({ data: applications });
+  const [data, total] = await Promise.all([
+    Application.find(filter).sort(sort).skip(pagination.skip).limit(pagination.limit).exec(),
+    Application.countDocuments(filter),
+  ]);
+
+  return responseHandler(
+    res.status(200),
+    {
+      page: pagination.page,
+      limit: pagination.limit,
+      total,
+      totalPages: Math.ceil(total / pagination.limit),
+      data,
+      message: 'Successful',
+    },
+    ['name', 'description', 'enabled', 'smtp.host', 'smtp.port', 'smtp.secure', 'smtp.user', 'createdAt', 'updatedAt'],
+  );
 });
 
 export const getApplication = asyncHandler(async (req: Request, res: Response) => {
@@ -36,7 +52,17 @@ export const getApplication = asyncHandler(async (req: Request, res: Response) =
     throw new HttpError(404, `Application with id '${id}' not found.`, ErrorCodes.NOT_FOUND);
   }
 
-  return res.status(200).json({ data: application });
+  return responseHandler(res.status(200), { data: application }, [
+    'name',
+    'description',
+    'enabled',
+    'smtp.host',
+    'smtp.port',
+    'smtp.secure',
+    'smtp.user',
+    'createdAt',
+    'updatedAt',
+  ]);
 });
 
 export const updateApplication = asyncHandler(async (req: Request, res: Response) => {
@@ -58,10 +84,14 @@ export const updateApplication = asyncHandler(async (req: Request, res: Response
     throw new HttpError(404, `Application with id '${id}' not found.`, ErrorCodes.NOT_FOUND);
   }
 
-  return res.status(200).json({
-    data: applicationUpdated,
-    message: 'Application updated successfully',
-  });
+  return responseHandler(
+    res.status(200),
+    {
+      data: applicationUpdated,
+      message: 'Application updated successfully',
+    },
+    ['name', 'description', 'enabled', 'smtp.host', 'smtp.port', 'smtp.secure', 'smtp.user', 'createdAt', 'updatedAt'],
+  );
 });
 
 export const deleteApplication = asyncHandler(async (req: Request, res: Response) => {
@@ -76,7 +106,17 @@ export const deleteApplication = asyncHandler(async (req: Request, res: Response
     returnDeletedDocs: true,
   });
 
-  return res.status(200).json(result);
+  return responseHandler(res.status(200), result, [
+    'name',
+    'description',
+    'enabled',
+    'smtp.host',
+    'smtp.port',
+    'smtp.secure',
+    'smtp.user',
+    'createdAt',
+    'updatedAt',
+  ]);
 });
 
 export const generateApplicationKey = asyncHandler(async (req: Request, res: Response) => {
@@ -90,7 +130,7 @@ export const generateApplicationKey = asyncHandler(async (req: Request, res: Res
     throw new HttpError(404, `Application with id '${id}' not found.`, ErrorCodes.NOT_FOUND);
   }
 
-  return res.status(200).json({
+  return responseHandler(res.status(200), {
     data: {
       apiKey: applicationUpdated.apiKey,
     },
@@ -113,8 +153,12 @@ export const updateApplicationSmtp = asyncHandler(async (req: Request, res: Resp
     throw new HttpError(404, `Application with id '${id}' not found.`, ErrorCodes.NOT_FOUND);
   }
 
-  return res.status(200).json({
-    data: applicationUpdated,
-    message: 'Application updated successfully',
-  });
+  return responseHandler(
+    res.status(200),
+    {
+      data: applicationUpdated,
+      message: 'Application updated successfully',
+    },
+    ['name', 'description', 'enabled', 'smtp.host', 'smtp.port', 'smtp.secure', 'smtp.user', 'createdAt', 'updatedAt'],
+  );
 });

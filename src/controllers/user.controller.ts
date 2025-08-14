@@ -12,6 +12,8 @@ import {
   comparePassword,
   HttpError,
   obscureEmail,
+  responseHandler,
+  buildQueryOptions,
 } from '../utils';
 
 export const registerUser = asyncHandler(async (req: Request, res: Response) => {
@@ -60,25 +62,41 @@ export const registerUser = asyncHandler(async (req: Request, res: Response) => 
 
   // TODO: Send verification email
 
-  return res.status(201).json({ data: userCreated, message: 'User created successfully' });
+  return responseHandler(res.status(201), { data: userCreated, message: 'User created successfully' }, ['name', 'email', 'emailVerified']);
 });
 
 export const getAllUsers = asyncHandler(async (req: Request, res: Response) => {
-  const users = await User.find().populate('role').sort('-createdAt').exec();
+  const { filter, pagination, sort } = buildQueryOptions(req, ['name', 'email', 'createdAt', 'message']);
 
-  return res.status(200).json({ data: users });
+  const [data, total] = await Promise.all([
+    User.find(filter).sort(sort).skip(pagination.skip).limit(pagination.limit).exec(),
+    User.countDocuments(filter),
+  ]);
+
+  return responseHandler(
+    res.status(200),
+    {
+      page: pagination.page,
+      limit: pagination.limit,
+      total,
+      totalPages: Math.ceil(total / pagination.limit),
+      data,
+      message: 'Successful',
+    },
+    ['name', 'email', 'emailVerified', 'role', 'enabled'],
+  );
 });
 
 export const getUser = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
 
-  const user = await User.findOne({ _id: id }).populate('role').exec();
+  const user = await User.findOne({ _id: id }).exec();
 
   if (!user) {
     throw new HttpError(404, `User with id '${id}' not found.`, ErrorCodes.NOT_FOUND);
   }
 
-  return res.status(200).json({ data: user });
+  return responseHandler(res.status(200), { data: user }, ['name', 'email', 'emailVerified', 'role', 'enabled']);
 });
 
 export const signinUser = asyncHandler(async (req: Request, res: Response) => {
@@ -122,7 +140,7 @@ export const signinUser = asyncHandler(async (req: Request, res: Response) => {
 
   await user.save();
 
-  return res.status(200).json({
+  return responseHandler(res.status(200), {
     accessToken,
     refreshToken,
     user: {
@@ -136,16 +154,9 @@ export const signinUser = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const signoutUser = asyncHandler(async (req: Request, res: Response) => {
-  let token = req.headers['authorization'];
+  const { user } = res.locals;
 
-  if (!token || typeof token !== 'string') {
-    throw new HttpError(401, 'Authorization token missing', ErrorCodes.UNAUTHORIZED);
-  }
-  if (token.startsWith('Bearer ')) {
-    token = token.slice(7);
-  }
-
-  const user = await User.findOne({ accessToken: token }).exec();
+  console.log(user);
 
   if (!user) {
     throw new HttpError(404, 'User not found', ErrorCodes.NOT_FOUND);
@@ -197,7 +208,7 @@ export const refreshTokenUser = asyncHandler(async (req: Request, res: Response)
   user.refreshToken = newRefreshToken;
   await user.save();
 
-  return res.status(200).json({
+  return responseHandler(res.status(200), {
     accessToken: newAccessToken,
     refreshToken: newRefreshToken,
     user: {
@@ -232,5 +243,5 @@ export const deleteUser = asyncHandler(async (req: Request, res: Response) => {
     returnDeletedDocs: true,
   });
 
-  return res.status(200).json(result);
+  return responseHandler(res.status(200), result, ['name', 'email', 'emailVerified']);
 });

@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { Application, Message, MessageInput, UserDocument } from '../models';
-import { asyncHandler, emailRegex, ErrorCodes, HttpError } from '../utils';
+import { asyncHandler, buildQueryOptions, emailRegex, ErrorCodes, HttpError, responseHandler } from '../utils';
 
 export const queueMessage = asyncHandler(async (req: Request, res: Response) => {
   const { from, key, message, subject, to, urgent } = req.body || {};
@@ -42,11 +42,34 @@ export const queueMessage = asyncHandler(async (req: Request, res: Response) => 
 
   const messageQueued = await Message.create(messageInput);
 
-  return res.status(201).json({ data: messageQueued, message: 'Message queued successfully' });
+  return responseHandler(
+    res.status(201),
+    {
+      data: messageQueued,
+      message: 'Message queued successfully',
+    },
+    ['from', 'to', 'subject', 'message', 'urgent', 'createdAt'],
+  );
 });
 
 export const getAllMessages = asyncHandler(async (req: Request, res: Response) => {
-  const messages = await Message.find().sort('-createdAt').exec();
+  const { filter, pagination, sort } = buildQueryOptions(req, ['subject', 'from', 'createdAt', 'message']);
 
-  return res.status(200).json({ data: messages });
+  const [data, total] = await Promise.all([
+    Message.find(filter).sort(sort).skip(pagination.skip).limit(pagination.limit).exec(),
+    Message.countDocuments(filter),
+  ]);
+
+  return responseHandler(
+    res.status(200),
+    {
+      page: pagination.page,
+      limit: pagination.limit,
+      total,
+      totalPages: Math.ceil(total / pagination.limit),
+      data,
+      message: 'Successful',
+    },
+    ['from', 'subject', 'createdAt', 'updatedAt'],
+  );
 });
