@@ -14,6 +14,7 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 const HOST = process.env.HOST || 'http://localhost';
 const PORT = parseInt(process.env.PORT || '4500');
 
+console.log(process.env);
 const app = express();
 
 app.use(express.urlencoded({ extended: true }));
