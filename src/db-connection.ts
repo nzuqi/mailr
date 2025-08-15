@@ -5,7 +5,7 @@ mongoose.Promise = global.Promise;
 
 const { MONGODB_URL } = process.env;
 
-console.log(MONGODB_URL);
+logger.info(MONGODB_URL);
 
 const connectToDatabase = async (): Promise<void> => {
   if (!MONGODB_URL) {
