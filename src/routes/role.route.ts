@@ -5,9 +5,9 @@ import { authenticate } from '../utils';
 export const roleRoutes = () => {
   const router = Router();
 
-  router.post('/v1/roles', authenticate(['ADMIN']), createRole);
+  router.post('/v1/roles', createRole);
 
-  router.get('/v1/roles', authenticate(['ADMIN']), getAllRoles);
+  router.get('/v1/roles', getAllRoles);
 
   router.get('/v1/roles/:id', authenticate(), getRole);
 
