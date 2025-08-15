@@ -21,7 +21,7 @@ export const userRoutes = () => {
 
   router.post('/v1/signout', authenticate(), signoutUser);
 
-  router.get('/v1/users', getAllUsers);
+  router.get('/v1/users', authenticate(['ADMIN']), getAllUsers);
 
   router.get('/v1/users/:id', authenticate(), getUser);
 
