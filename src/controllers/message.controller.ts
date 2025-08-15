@@ -35,7 +35,7 @@ export const queueMessage = asyncHandler(async (req: Request, res: Response) => 
     to: recipients,
     subject: subject.trim(),
     message: message.trim(),
-    user: (user._id || '').toString(),
+    user: (user?._id || '').toString(),
     application: (application._id || '').toString(),
     urgent: typeof urgent === 'boolean' ? urgent : false,
   };

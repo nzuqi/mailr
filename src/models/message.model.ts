@@ -6,7 +6,7 @@ type MessageDocument = Document & {
   subject: string;
   message: string;
   application: string;
-  user: string;
+  user: string | null;
   status: number; // 0: Queued, 1: Sent, 2: Failed
   urgent: boolean;
   sentAt?: Date;
@@ -20,7 +20,7 @@ type MessageInput = {
   subject: MessageDocument['subject'];
   message: MessageDocument['message'];
   application: MessageDocument['application'];
-  user: MessageDocument['user'];
+  user?: MessageDocument['user'];
   status?: MessageDocument['status'];
   urgent?: MessageDocument['urgent'];
 };
@@ -49,10 +49,8 @@ const messageSchema = new Schema(
       required: true,
     },
     user: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
-      index: true,
+      type: Schema.Types.String,
+      default: null,
     },
     status: {
       type: Schema.Types.Number,
