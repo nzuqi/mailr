@@ -7,7 +7,6 @@ import { errorHandler } from './utils/middleware/error-handler';
 import routes from './routes';
 import { logger, startMessageProcessor } from './utils';
 
-console.log(process.env);
 const HOST = process.env.HOST || 'http://localhost';
 const PORT = parseInt(process.env.PORT || '4500');
 
