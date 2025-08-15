@@ -10,7 +10,7 @@ import path from 'path';
 import dotenv from 'dotenv';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
-
+console.log(process.env);
 const HOST = process.env.HOST || 'http://localhost';
 const PORT = parseInt(process.env.PORT || '4500');
 

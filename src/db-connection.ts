@@ -3,10 +3,7 @@ import { logger } from './utils';
 
 mongoose.Promise = global.Promise;
 
-// const { MONGODB_URL } = process.env;
-const MONGODB_URL = 'mongodb://127.0.0.1:27017/mailr';
-
-logger.info(MONGODB_URL);
+const { MONGODB_URL } = process.env;
 
 const connectToDatabase = async (): Promise<void> => {
   if (!MONGODB_URL) {
