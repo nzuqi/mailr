@@ -1,6 +1,6 @@
-# mailr
+# Mailr
 
-Mail processing service.
+Mail processing API service.
 
 ## Prerequisites
 
