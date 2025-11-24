@@ -45,12 +45,25 @@ export const processQueuedMessages = async () => {
           },
         });
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let mailAttachments: any[] = [];
+
+        if (Array.isArray(msg.attachments) && msg.attachments.length > 0) {
+          mailAttachments = msg.attachments.map((a) => ({
+            filename: a.filename,
+            content: Buffer.from(a.content, 'base64'),
+            contentType: a.type,
+            disposition: a.disposition || 'attachment',
+          }));
+        }
+
         await transporter.sendMail({
           from: `"${msg.from}" <${smtpConfig.user}>`,
           to: msg.to.join(', '),
           subject: msg.subject,
           text: htmlToText(msg.message),
           html: msg.message,
+          attachments: mailAttachments,
         });
 
         msg.status = 1;

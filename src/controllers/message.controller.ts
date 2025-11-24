@@ -1,9 +1,9 @@
 import { Request, Response } from 'express';
-import { Application, Message, MessageInput, UserDocument } from '../models';
+import { Application, Attachment, Message, MessageInput, UserDocument } from '../models';
 import { asyncHandler, buildQueryOptions, emailRegex, ErrorCodes, HttpError, responseHandler } from '../utils';
 
 export const queueMessage = asyncHandler(async (req: Request, res: Response) => {
-  const { from, key, message, subject, to, urgent } = req.body || {};
+  const { attachments, from, key, message, subject, to, urgent } = req.body || {};
   const user: UserDocument = res.locals.user || {};
 
   if (
@@ -30,6 +30,23 @@ export const queueMessage = asyncHandler(async (req: Request, res: Response) => 
     throw new HttpError(401, 'Invalid credentials', ErrorCodes.UNAUTHORIZED);
   }
 
+  let parsedAttachments: Attachment[] = [];
+
+  if (Array.isArray(attachments)) {
+    parsedAttachments = attachments
+      .filter(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (a: any) => a && typeof a.filename === 'string' && typeof a.type === 'string' && typeof a.content === 'string',
+      )
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((a: any) => ({
+        filename: a.filename,
+        type: a.type,
+        content: a.content,
+        disposition: typeof a.disposition === 'string' ? a.disposition : 'attachment',
+      }));
+  }
+
   const messageInput: MessageInput = {
     from,
     to: recipients,
@@ -38,6 +55,7 @@ export const queueMessage = asyncHandler(async (req: Request, res: Response) => 
     user: (user?._id || '').toString(),
     application: (application._id || '').toString(),
     urgent: typeof urgent === 'boolean' ? urgent : false,
+    attachments: parsedAttachments,
   };
 
   const messageQueued = await Message.create(messageInput);
@@ -48,7 +66,7 @@ export const queueMessage = asyncHandler(async (req: Request, res: Response) => 
       data: messageQueued,
       message: 'Message queued successfully',
     },
-    ['from', 'to', 'subject', 'message', 'urgent', 'createdAt'],
+    ['from', 'to', 'subject', 'message', 'urgent', 'attachments', 'createdAt'],
   );
 });
 

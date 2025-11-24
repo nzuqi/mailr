@@ -1,5 +1,12 @@
 import mongoose, { Schema, Model, Document } from 'mongoose';
 
+export type Attachment = {
+  filename: string;
+  type: string;
+  content: string; // Base64
+  disposition?: string; // optional
+};
+
 type MessageDocument = Document & {
   from: string;
   to: string[];
@@ -12,6 +19,7 @@ type MessageDocument = Document & {
   sentAt?: Date;
   retryCount?: number;
   error?: string;
+  attachments?: Attachment[];
 };
 
 type MessageInput = {
@@ -23,7 +31,18 @@ type MessageInput = {
   user?: MessageDocument['user'];
   status?: MessageDocument['status'];
   urgent?: MessageDocument['urgent'];
+  attachments?: Attachment[];
 };
+
+const attachmentSchema = new Schema<Attachment>(
+  {
+    filename: { type: Schema.Types.String, required: true },
+    type: { type: Schema.Types.String, required: true },
+    content: { type: Schema.Types.String, required: true }, // Base64
+    disposition: { type: Schema.Types.String, default: 'attachment' },
+  },
+  { _id: false },
+);
 
 const messageSchema = new Schema(
   {
@@ -71,6 +90,10 @@ const messageSchema = new Schema(
     retryCount: {
       type: Schema.Types.Number,
       default: 0,
+    },
+    attachments: {
+      type: [attachmentSchema],
+      default: [],
     },
   },
   {
