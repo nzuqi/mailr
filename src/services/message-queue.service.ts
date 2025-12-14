@@ -61,7 +61,8 @@ export const processQueuedMessages = async () => {
           from: `"${msg.from}" <${smtpConfig.user}>`,
           to: msg.to.join(', '),
           subject: msg.subject,
-          text: htmlToText(msg.message),
+          // text: htmlToText(msg.message),
+          text: msg.message,
           html: msg.message,
           attachments: mailAttachments,
         });
