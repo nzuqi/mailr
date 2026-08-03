@@ -88,6 +88,6 @@ export const getAllMessages = asyncHandler(async (req: Request, res: Response) =
       data,
       message: 'Successful',
     },
-    ['from', 'subject', 'createdAt', 'updatedAt'],
+    ['from', 'subject', 'createdAt', 'updatedAt', 'application'],
   );
 });
