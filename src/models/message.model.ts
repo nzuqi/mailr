@@ -1,4 +1,4 @@
-import mongoose, { Schema, Model, Document } from 'mongoose';
+import mongoose, { Schema, Model, Document, Types } from 'mongoose';
 
 export type Attachment = {
   filename: string;
@@ -12,7 +12,7 @@ type MessageDocument = Document & {
   to: string[];
   subject: string;
   message: string;
-  application: string;
+  application: Types.ObjectId;
   user: string | null;
   status: number; // 0: Queued, 1: Sent, 2: Failed
   urgent: boolean;
@@ -66,6 +66,7 @@ const messageSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: 'Application',
       required: true,
+      immutable: true,
     },
     user: {
       type: Schema.Types.String,
