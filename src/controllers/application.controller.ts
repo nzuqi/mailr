@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import { Application, ApplicationInput, SmtpData, UserDocument } from '../models';
-import { asyncHandler, buildQueryOptions, deleteHandler, ErrorCodes, generateRandomString, HttpError, responseHandler } from '../utils';
+import { Application, ApplicationInput, Message, SmtpData, UserDocument } from '../models';
+import { asyncHandler, buildQueryOptions, deleteHandler, ErrorCodes, generateApiKey, HttpError, responseHandler } from '../utils';
 
 export const createApplication = asyncHandler(async (req: Request, res: Response) => {
   const { description, name } = req.body || {};
@@ -97,6 +97,20 @@ export const updateApplication = asyncHandler(async (req: Request, res: Response
 export const deleteApplication = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params; // single delete
   const { ids } = req.body || {}; // bulk delete
+  const applicationIds = id ? [id] : Array.isArray(ids) ? ids : [];
+
+  // Messages queued before SMTP snapshots were introduced still depend on the
+  // application record. Preserve that record until the legacy queue drains.
+  const hasLegacyQueuedMessages =
+    applicationIds.length > 0 && (await Message.exists({ application: { $in: applicationIds }, status: 0, smtp: null }));
+
+  if (hasLegacyQueuedMessages) {
+    throw new HttpError(
+      409,
+      'This application has queued legacy messages. Send or remove them before deleting the application.',
+      ErrorCodes.NOT_ALLOWED,
+    );
+  }
 
   const result = await deleteHandler({
     model: Application,
@@ -122,7 +136,7 @@ export const deleteApplication = asyncHandler(async (req: Request, res: Response
 export const generateApplicationKey = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params || {};
 
-  const apiKey: string = generateRandomString(50, true);
+  const apiKey = generateApiKey();
 
   const applicationUpdated = await Application.findByIdAndUpdate(id, { apiKey }, { new: true, runValidators: true });
 

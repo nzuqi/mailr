@@ -1,10 +1,26 @@
 import nodemailer from 'nodemailer';
-import { Application, Message, SmtpData } from '../models';
+import { Application, Message } from '../models';
 import { MessageDocument } from '../models/message.model';
 import { htmlToText, logger } from '../utils';
 
 const MAX_RETRIES = 3;
 const PROCESS_LIMIT = 10;
+
+const isRetryableError = (error: unknown) => {
+  const smtpError = error as { code?: string; responseCode?: number };
+
+  // Authentication, invalid envelopes, and SMTP 5xx responses require a
+  // configuration or content change; retrying them cannot succeed.
+  if (smtpError.code === 'EAUTH' || smtpError.code === 'EENVELOPE' || smtpError.code === 'ESMTP_CONFIG') {
+    return false;
+  }
+
+  if (smtpError.responseCode === undefined) {
+    return true;
+  }
+
+  return smtpError.responseCode < 500;
+};
 
 export const processQueuedMessages = async () => {
   try {
@@ -25,14 +41,19 @@ export const processQueuedMessages = async () => {
 
     for (const msg of queuedMessages) {
       try {
-        // Fetch application to get SMTP details
-        const application = await Application.findById(msg.application).exec();
+        // New messages always carry this immutable snapshot. The fallback keeps
+        // pre-existing queue records deliverable during rollout.
+        let smtpConfig = msg.smtp;
 
-        if (!application || !application.smtp) {
-          throw new Error(`SMTP configuration missing for application ${msg.application}`);
+        if (!smtpConfig) {
+          const application = await Application.findById(msg.application).select('smtp').exec();
+
+          smtpConfig = application?.smtp instanceof Map ? Object.fromEntries(application.smtp) : application?.smtp || null;
         }
 
-        const smtpConfig: SmtpData = application.smtp instanceof Map ? Object.fromEntries(application.smtp) : application.smtp || {};
+        if (!smtpConfig) {
+          throw Object.assign(new Error(`SMTP configuration missing for application ${msg.application}`), { code: 'ESMTP_CONFIG' });
+        }
 
         // Create Nodemailer transport for this application
         const transporter = nodemailer.createTransport({
@@ -72,11 +93,13 @@ export const processQueuedMessages = async () => {
 
         logger.info(`✅ Message ${msg._id} sent successfully.`);
       } catch (err) {
-        msg.retryCount = (msg.retryCount || 0) + 1;
+        const retryable = isRetryableError(err);
 
-        if (msg.retryCount >= MAX_RETRIES) {
+        msg.retryCount = retryable ? (msg.retryCount || 0) + 1 : MAX_RETRIES;
+
+        if (!retryable || msg.retryCount >= MAX_RETRIES) {
           msg.status = 2;
-          logger.error(`❌ Message ${msg._id} permanently failed after ${MAX_RETRIES} retries.`);
+          logger.error(`❌ Message ${msg._id} permanently failed${retryable ? ` after ${MAX_RETRIES} retries` : ''}.`);
         } else {
           logger.warn(`⚠️ Message ${msg._id} failed (retry ${msg.retryCount}/${MAX_RETRIES}).`);
         }

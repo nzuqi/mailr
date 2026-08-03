@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { Application, Attachment, Message, MessageInput, UserDocument } from '../models';
+import { Application, Attachment, Message, MessageInput, SmtpData, UserDocument } from '../models';
 import { asyncHandler, buildQueryOptions, emailRegex, ErrorCodes, HttpError, responseHandler } from '../utils';
 
 export const queueMessage = asyncHandler(async (req: Request, res: Response) => {
@@ -24,13 +24,18 @@ export const queueMessage = asyncHandler(async (req: Request, res: Response) => 
     throw new HttpError(422, `Invalid recipient email format: ${invalidEmail}`, ErrorCodes.VALIDATION);
   }
 
-  // Select only the application identity that is persisted on the message.
-  // This keeps SMTP configuration and other mutable application fields out of
-  // the request-to-message attribution path.
-  const application = await Application.findOne({ apiKey: key, enabled: true }).select('_id').exec();
+  // Capture the exact application identity and SMTP settings together. The
+  // latter is persisted on the message so app updates cannot affect its send.
+  const application = await Application.findOne({ apiKey: key, enabled: true }).select('_id smtp').exec();
 
   if (!application) {
     throw new HttpError(401, 'Invalid credentials', ErrorCodes.UNAUTHORIZED);
+  }
+
+  const smtp: SmtpData | null = application.smtp instanceof Map ? Object.fromEntries(application.smtp) : application.smtp || null;
+
+  if (!smtp) {
+    throw new HttpError(409, 'SMTP configuration is required before sending messages.', ErrorCodes.VALIDATION);
   }
 
   let parsedAttachments: Attachment[] = [];
@@ -57,6 +62,7 @@ export const queueMessage = asyncHandler(async (req: Request, res: Response) => 
     message: message.trim(),
     user: (user?._id || '').toString(),
     application: application._id,
+    smtp: { ...smtp },
     urgent: typeof urgent === 'boolean' ? urgent : false,
     attachments: parsedAttachments,
   };

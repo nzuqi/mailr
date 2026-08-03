@@ -17,6 +17,16 @@ export const generateRandomString = (length: number, hasSpecialChars: boolean = 
   return result;
 };
 
+/**
+ * Generates an API key that is safe to send unchanged in JSON, URLs, and
+ * form-encoded clients. base64url never emits `+`, `/`, or `=`.
+ */
+export const generateApiKey = (length: number = 50) => {
+  const bytesNeeded = Math.ceil((length * 3) / 4);
+
+  return crypto.randomBytes(bytesNeeded).toString('base64url').slice(0, length);
+};
+
 export const hashPassword = (password: string) => {
   const salt = crypto.randomBytes(16).toString('hex');
   const hash = crypto.pbkdf2Sync(password, salt, 100, 64, 'sha512').toString('hex');

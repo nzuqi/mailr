@@ -1,4 +1,5 @@
 import mongoose, { Schema, Model, Document, Types } from 'mongoose';
+import { SmtpData } from './application.model';
 
 export type Attachment = {
   filename: string;
@@ -13,6 +14,7 @@ type MessageDocument = Document & {
   subject: string;
   message: string;
   application: Types.ObjectId;
+  smtp?: SmtpData | null;
   user: string | null;
   status: number; // 0: Queued, 1: Sent, 2: Failed
   urgent: boolean;
@@ -28,6 +30,7 @@ type MessageInput = {
   subject: MessageDocument['subject'];
   message: MessageDocument['message'];
   application: MessageDocument['application'];
+  smtp?: MessageDocument['smtp'];
   user?: MessageDocument['user'];
   status?: MessageDocument['status'];
   urgent?: MessageDocument['urgent'];
@@ -66,6 +69,13 @@ const messageSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: 'Application',
       required: true,
+      immutable: true,
+    },
+    // SMTP is captured when a message is queued so later application changes
+    // cannot affect an in-flight message.
+    smtp: {
+      type: Schema.Types.Mixed,
+      default: null,
       immutable: true,
     },
     user: {
