@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getAllMessages, queueMessage } from '../controllers';
+import { getAllMessages, getMessageAttribution, queueMessage } from '../controllers';
 import { authenticate } from '../utils';
 
 export const messageRoutes = () => {
@@ -8,6 +8,8 @@ export const messageRoutes = () => {
   router.post('/v1/messages', queueMessage);
 
   router.get('/v1/messages', authenticate(), getAllMessages);
+
+  router.get('/v1/messages/:id/attribution', authenticate(['ADMIN']), getMessageAttribution);
 
   return router;
 };

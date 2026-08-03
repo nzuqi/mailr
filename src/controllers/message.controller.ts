@@ -123,3 +123,31 @@ export const getAllMessages = asyncHandler(async (req: Request, res: Response) =
     ['from', 'subject', 'createdAt', 'updatedAt', 'application'],
   );
 });
+
+export const getMessageAttribution = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const message = await Message.findById(id).select('_id application apiKeyHash createdAt status sentAt').exec();
+
+  if (!message) {
+    throw new HttpError(404, `Message with id '${id}' not found.`, ErrorCodes.NOT_FOUND);
+  }
+
+  const application = await Application.findById(message.application).select('_id name apiKey').exec();
+  const currentApiKeyHash = application?.apiKey ? hashApiKey(application.apiKey) : null;
+  const messageApiKeyHash = message.apiKeyHash || null;
+  const attributedApplication = application ? { id: application._id, name: application.name } : null;
+
+  return responseHandler(res.status(200), {
+    data: {
+      messageId: message._id,
+      createdAt: message.createdAt,
+      status: message.status,
+      sentAt: message.sentAt || null,
+      application: attributedApplication,
+      messageApiKeyFingerprint: messageApiKeyHash?.slice(0, 12) || null,
+      currentApplicationKeyFingerprint: currentApiKeyHash?.slice(0, 12) || null,
+      currentApplicationKeyMatchesMessage: Boolean(messageApiKeyHash && currentApiKeyHash && messageApiKeyHash === currentApiKeyHash),
+    },
+    message: 'Successful',
+  });
+});

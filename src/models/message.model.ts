@@ -23,6 +23,8 @@ type MessageDocument = Document & {
   retryCount?: number;
   error?: string;
   attachments?: Attachment[];
+  createdAt: Date;
+  updatedAt: Date;
 };
 
 type MessageInput = {
