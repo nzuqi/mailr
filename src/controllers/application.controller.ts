@@ -132,6 +132,7 @@ export const generateApplicationKey = asyncHandler(async (req: Request, res: Res
 
   return responseHandler(res.status(200), {
     data: {
+      name: applicationUpdated.name,
       apiKey: applicationUpdated.apiKey,
     },
     message: 'Application API key generated successfully',
