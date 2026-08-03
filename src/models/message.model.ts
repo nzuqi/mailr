@@ -14,6 +14,7 @@ type MessageDocument = Document & {
   subject: string;
   message: string;
   application: Types.ObjectId;
+  apiKeyHash?: string | null;
   smtp?: SmtpData | null;
   user: string | null;
   status: number; // 0: Queued, 1: Sent, 2: Failed
@@ -30,6 +31,7 @@ type MessageInput = {
   subject: MessageDocument['subject'];
   message: MessageDocument['message'];
   application: MessageDocument['application'];
+  apiKeyHash?: MessageDocument['apiKeyHash'];
   smtp?: MessageDocument['smtp'];
   user?: MessageDocument['user'];
   status?: MessageDocument['status'];
@@ -69,6 +71,12 @@ const messageSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: 'Application',
       required: true,
+      immutable: true,
+    },
+    // Stores a one-way fingerprint of the submitted key for attribution audits.
+    apiKeyHash: {
+      type: Schema.Types.String,
+      default: null,
       immutable: true,
     },
     // SMTP is captured when a message is queued so later application changes

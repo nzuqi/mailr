@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { Application, Attachment, Message, MessageInput, SmtpData, UserDocument } from '../models';
-import { asyncHandler, buildQueryOptions, emailRegex, ErrorCodes, HttpError, responseHandler } from '../utils';
+import { asyncHandler, buildQueryOptions, emailRegex, ErrorCodes, hashApiKey, HttpError, responseHandler } from '../utils';
 
 export const queueMessage = asyncHandler(async (req: Request, res: Response) => {
   const { attachments, from, key, message, subject, to, urgent } = req.body || {};
@@ -24,9 +24,29 @@ export const queueMessage = asyncHandler(async (req: Request, res: Response) => 
     throw new HttpError(422, `Invalid recipient email format: ${invalidEmail}`, ErrorCodes.VALIDATION);
   }
 
-  // Capture the exact application identity and SMTP settings together. The
-  // latter is persisted on the message so app updates cannot affect its send.
-  const application = await Application.findOne({ apiKey: key, enabled: true }).select('_id smtp').exec();
+  const apiKeyHash = hashApiKey(key);
+  const applicationFields = '_id smtp apiKey';
+  // New keys are resolved through a one-way fingerprint, avoiding any database
+  // collation or string-normalization behaviour in the key lookup.
+  let application = await Application.findOne({ apiKeyHash, enabled: true }).select(applicationFields).exec();
+
+  if (application && application.apiKey !== key) {
+    application = null;
+  }
+
+  // Existing keys are upgraded on first use. `simple` forces a byte-for-byte
+  // legacy key comparison instead of the collection's default collation.
+  if (!application) {
+    application = await Application.findOne({ apiKey: key, enabled: true }).collation({ locale: 'simple' }).select(applicationFields).exec();
+
+    if (application && application.apiKey !== key) {
+      application = null;
+    }
+
+    if (application) {
+      await Application.updateOne({ _id: application._id }, { apiKeyHash }).exec();
+    }
+  }
 
   if (!application) {
     throw new HttpError(401, 'Invalid credentials', ErrorCodes.UNAUTHORIZED);
@@ -62,6 +82,7 @@ export const queueMessage = asyncHandler(async (req: Request, res: Response) => 
     message: message.trim(),
     user: (user?._id || '').toString(),
     application: application._id,
+    apiKeyHash,
     smtp: { ...smtp },
     urgent: typeof urgent === 'boolean' ? urgent : false,
     attachments: parsedAttachments,

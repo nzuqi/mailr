@@ -27,6 +27,8 @@ export const generateApiKey = (length: number = 50) => {
   return crypto.randomBytes(bytesNeeded).toString('base64url').slice(0, length);
 };
 
+export const hashApiKey = (apiKey: string) => crypto.createHash('sha256').update(apiKey).digest('hex');
+
 export const hashPassword = (password: string) => {
   const salt = crypto.randomBytes(16).toString('hex');
   const hash = crypto.pbkdf2Sync(password, salt, 100, 64, 'sha512').toString('hex');

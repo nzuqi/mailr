@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { Application, ApplicationInput, Message, SmtpData, UserDocument } from '../models';
-import { asyncHandler, buildQueryOptions, deleteHandler, ErrorCodes, generateApiKey, HttpError, responseHandler } from '../utils';
+import { asyncHandler, buildQueryOptions, deleteHandler, ErrorCodes, generateApiKey, hashApiKey, HttpError, responseHandler } from '../utils';
 
 export const createApplication = asyncHandler(async (req: Request, res: Response) => {
   const { description, name } = req.body || {};
@@ -137,8 +137,9 @@ export const generateApplicationKey = asyncHandler(async (req: Request, res: Res
   const { id } = req.params || {};
 
   const apiKey = generateApiKey();
+  const apiKeyHash = hashApiKey(apiKey);
 
-  const applicationUpdated = await Application.findByIdAndUpdate(id, { apiKey }, { new: true, runValidators: true });
+  const applicationUpdated = await Application.findByIdAndUpdate(id, { apiKey, apiKeyHash }, { new: true, runValidators: true });
 
   if (!applicationUpdated) {
     throw new HttpError(404, `Application with id '${id}' not found.`, ErrorCodes.NOT_FOUND);

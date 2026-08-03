@@ -12,6 +12,7 @@ type ApplicationDocument = Document & {
   name: string;
   description: string | null;
   apiKey?: string | null;
+  apiKeyHash?: string | null;
   user: string;
   enabled?: boolean;
   smtp?: SmtpData;
@@ -40,6 +41,11 @@ const applicationSchema = new Schema(
     apiKey: {
       type: Schema.Types.String,
       default: null,
+    },
+    apiKeyHash: {
+      type: Schema.Types.String,
+      default: null,
+      index: true,
     },
     user: {
       type: Schema.Types.ObjectId,
