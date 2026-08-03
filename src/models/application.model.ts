@@ -62,6 +62,17 @@ const applicationSchema = new Schema(
   },
 );
 
+// Applications without a key are allowed, while every issued key must identify
+// exactly one application. A partial index avoids treating the default `null`
+// value as a duplicate.
+applicationSchema.index(
+  { apiKey: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { apiKey: { $type: 'string' } },
+  },
+);
+
 const Application: Model<ApplicationDocument> = mongoose.model<ApplicationDocument>('Application', applicationSchema);
 
 export { Application, ApplicationInput, ApplicationDocument };

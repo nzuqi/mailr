@@ -24,11 +24,24 @@ export const queueMessage = asyncHandler(async (req: Request, res: Response) => 
     throw new HttpError(422, `Invalid recipient email format: ${invalidEmail}`, ErrorCodes.VALIDATION);
   }
 
-  const application = await Application.findOne({ apiKey: key, enabled: true }).exec();
+  // Do not let a legacy duplicate key silently select an arbitrary application.
+  // The unique index prevents new duplicates; this check protects messages until
+  // any existing duplicate data has been resolved.
+  const applications = await Application.find({ apiKey: key, enabled: true }).limit(2).exec();
 
-  if (!application) {
+  if (applications.length === 0) {
     throw new HttpError(401, 'Invalid credentials', ErrorCodes.UNAUTHORIZED);
   }
+
+  if (applications.length > 1) {
+    throw new HttpError(
+      409,
+      'This API key is associated with multiple applications. Regenerate the key before sending messages.',
+      ErrorCodes.DUPLICATE_KEY,
+    );
+  }
+
+  const [application] = applications;
 
   let parsedAttachments: Attachment[] = [];
 
