@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { Application, Attachment, Message, MessageInput, SmtpData, UserDocument } from '../models';
-import { asyncHandler, buildQueryOptions, emailRegex, ErrorCodes, hashApiKey, HttpError, responseHandler } from '../utils';
+import { asyncHandler, buildQueryOptions, emailRegex, ErrorCodes, hashApiKey, HttpError, logger, responseHandler } from '../utils';
 
 export const queueMessage = asyncHandler(async (req: Request, res: Response) => {
   const { attachments, from, key, message, subject, to, urgent } = req.body || {};
@@ -90,13 +90,15 @@ export const queueMessage = asyncHandler(async (req: Request, res: Response) => 
 
   const messageQueued = await Message.create(messageInput);
 
+  logger.info(`Message ${messageQueued._id} queued for application ${application._id} (API key fingerprint: ${apiKeyHash.slice(0, 12)}).`);
+
   return responseHandler(
     res.status(201),
     {
       data: messageQueued,
       message: 'Message queued successfully',
     },
-    ['from', 'to', 'subject', 'message', 'urgent', 'attachments', 'createdAt'],
+    ['from', 'to', 'subject', 'message', 'application', 'urgent', 'attachments', 'createdAt'],
   );
 });
 
