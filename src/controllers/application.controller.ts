@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import mongoose from 'mongoose';
 import { Application, ApplicationInput, Message, SmtpData, UserDocument } from '../models';
 import { asyncHandler, buildQueryOptions, deleteHandler, ErrorCodes, generateApiKey, hashApiKey, HttpError, responseHandler } from '../utils';
 
@@ -45,6 +46,10 @@ export const getAllApplications = asyncHandler(async (req: Request, res: Respons
 
 export const getApplication = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
+
+  if (!mongoose.isValidObjectId(id)) {
+    throw new HttpError(422, 'Application id must be valid.', ErrorCodes.VALIDATION);
+  }
 
   const application = await Application.findOne({ _id: id });
 
