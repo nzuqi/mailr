@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
-import { Setting, SettingInput, User, UserInput } from '../models';
+import { Session, Setting, SettingInput, User, UserInput } from '../models';
 import { TwoFactorService } from '../services';
 import {
   asyncHandler,
@@ -10,6 +10,7 @@ import {
   ErrorCodes,
   generateRandomString,
   hashPassword,
+  hashToken,
   comparePassword,
   HttpError,
   obscureEmail,
@@ -19,6 +20,28 @@ import {
 
 const twoFactorService = new TwoFactorService();
 const twoFactorCodeRegex = /^\d{6}$/;
+const accessTokenDuration = '15m';
+const refreshTokenDuration = '7d';
+
+const issueTokens = (user: InstanceType<typeof User>, sessionId: string) => {
+  const jwtSecret = process.env.JWT_SECRET || '';
+  const base = { id: user._id, role: user.role, sessionId };
+
+  return {
+    accessToken: jwt.sign({ ...base, type: 'access' }, jwtSecret, { expiresIn: accessTokenDuration }),
+    refreshToken: jwt.sign({ id: user._id, sessionId, type: 'refresh' }, jwtSecret, { expiresIn: refreshTokenDuration }),
+  };
+};
+
+const refreshExpiry = (token: string) => {
+  const decoded = jwt.decode(token);
+
+  if (!decoded || typeof decoded === 'string' || !decoded.exp) {
+    throw new HttpError(401, 'Invalid refresh token', ErrorCodes.UNAUTHORIZED);
+  }
+
+  return new Date(decoded.exp * 1000);
+};
 
 export const registerUser = asyncHandler(async (req: Request, res: Response) => {
   const setting: SettingInput | null = await Setting.findOne({ key: 'app' });
@@ -145,18 +168,23 @@ export const signinUser = asyncHandler(async (req: Request, res: Response) => {
     }
   }
 
-  const jwtSecret = process.env.JWT_SECRET || '';
-  const accessToken = jwt.sign({ id: user._id, role: user.role }, jwtSecret, { expiresIn: '1h' });
-  const refreshToken = jwt.sign({ id: user._id, role: user.role }, jwtSecret, { expiresIn: '7d' });
+  const session = new Session({
+    user: user._id,
+    refreshTokenHash: 'pending',
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    ipAddress: req.ip,
+    userAgent: req.get('user-agent') || null,
+  });
+  const { accessToken, refreshToken } = issueTokens(user, session._id.toString());
 
-  user.accessToken = accessToken;
-  user.refreshToken = refreshToken;
-
-  await user.save();
+  session.refreshTokenHash = hashToken(refreshToken);
+  session.expiresAt = refreshExpiry(refreshToken);
+  await session.save();
 
   return responseHandler(res.status(200), {
     accessToken,
     refreshToken,
+    sessionId: session._id,
     user: {
       id: user._id,
       email: obscureEmail(user.email),
@@ -217,17 +245,16 @@ export const disableTwoFactor = asyncHandler(async (req: Request, res: Response)
 });
 
 export const signoutUser = asyncHandler(async (req: Request, res: Response) => {
-  const { user } = res.locals;
-
-  console.log(user);
+  const { session, user } = res.locals;
 
   if (!user) {
     throw new HttpError(404, 'User not found', ErrorCodes.NOT_FOUND);
   }
 
-  user.accessToken = null;
-  user.refreshToken = null;
-  await user.save();
+  if (session) {
+    session.revokedAt = new Date();
+    await session.save();
+  }
 
   return res.status(200).json({ message: 'Signed out successfully' });
 });
@@ -241,18 +268,38 @@ export const refreshTokenUser = asyncHandler(async (req: Request, res: Response)
 
   const jwtSecret = process.env.JWT_SECRET || '';
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let decoded: any;
+  let decoded: jwt.JwtPayload;
 
   try {
-    decoded = jwt.verify(refreshToken, jwtSecret);
+    const payload = jwt.verify(refreshToken, jwtSecret);
+
+    if (typeof payload === 'string' || payload.type !== 'refresh' || !payload.id || !payload.sessionId) {
+      throw new Error('Invalid token payload');
+    }
+    decoded = payload;
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (err) {
     throw new HttpError(401, 'Invalid or expired refresh token', ErrorCodes.UNAUTHORIZED);
   }
 
-  // Find user with matching refreshToken
-  const user = await User.findOne({ _id: decoded.id, refreshToken, emailVerified: true }).populate('role').exec();
+  const session = await Session.findOne({
+    _id: decoded.sessionId,
+    user: decoded.id,
+    revokedAt: null,
+    expiresAt: { $gt: new Date() },
+  })
+    .select('+refreshTokenHash')
+    .exec();
+
+  if (!session || session.refreshTokenHash !== hashToken(refreshToken)) {
+    if (session) {
+      session.revokedAt = new Date();
+      await session.save();
+    }
+    throw new HttpError(401, 'Invalid refresh token', ErrorCodes.UNAUTHORIZED);
+  }
+
+  const user = await User.findOne({ _id: decoded.id, emailVerified: true }).populate('role').exec();
 
   if (!user) {
     throw new HttpError(401, 'Invalid refresh token', ErrorCodes.UNAUTHORIZED);
@@ -262,18 +309,16 @@ export const refreshTokenUser = asyncHandler(async (req: Request, res: Response)
     throw new HttpError(403, 'Account disabled', ErrorCodes.ACCOUNT_DISABLED);
   }
 
-  // Generate new tokens
-  const newAccessToken = jwt.sign({ id: user._id }, jwtSecret, { expiresIn: '1h' });
-  const newRefreshToken = jwt.sign({ id: user._id }, jwtSecret, { expiresIn: '7d' });
+  const { accessToken: newAccessToken, refreshToken: newRefreshToken } = issueTokens(user, session._id.toString());
 
-  // Update tokens in DB
-  user.accessToken = newAccessToken;
-  user.refreshToken = newRefreshToken;
-  await user.save();
+  session.refreshTokenHash = hashToken(newRefreshToken);
+  session.expiresAt = refreshExpiry(newRefreshToken);
+  await session.save();
 
   return responseHandler(res.status(200), {
     accessToken: newAccessToken,
     refreshToken: newRefreshToken,
+    sessionId: session._id,
     user: {
       id: user._id,
       email: user.email,

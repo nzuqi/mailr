@@ -42,7 +42,7 @@ export const userRoutes = () => {
 
   router.post('/v1/resend-verification', resendVerificationUser);
 
-  router.post('/v1/refresh-token', refreshTokenUser);
+  router.post('/v1/refresh-token', sensitiveLimiter, refreshTokenUser);
 
   return router;
 };

@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { HttpError, ErrorCodes } from '../';
-import { User } from '../../models';
+import { Session, User } from '../../models';
 
 type RoleType = string | string[];
 
@@ -27,8 +27,22 @@ export const authenticate = (allowedRoles?: RoleType) => async (req: Request, re
       throw new HttpError(401, 'Invalid or expired token', ErrorCodes.UNAUTHORIZED);
     }
 
-    // Find user with matching ID and accessToken
-    const user = await User.findOne({ _id: decoded.id, accessToken: token, enabled: true, emailVerified: true }).populate('role').exec();
+    if (decoded.type !== 'access' || !decoded.id || !decoded.sessionId) {
+      throw new HttpError(401, 'Invalid token', ErrorCodes.UNAUTHORIZED);
+    }
+
+    const session = await Session.findOne({
+      _id: decoded.sessionId,
+      user: decoded.id,
+      revokedAt: null,
+      expiresAt: { $gt: new Date() },
+    }).exec();
+
+    if (!session) {
+      throw new HttpError(401, 'Invalid or expired session', ErrorCodes.UNAUTHORIZED);
+    }
+
+    const user = await User.findOne({ _id: decoded.id, enabled: true, emailVerified: true }).populate('role').exec();
 
     if (!user) {
       throw new HttpError(401, 'Invalid token or user not found', ErrorCodes.UNAUTHORIZED);
@@ -48,6 +62,7 @@ export const authenticate = (allowedRoles?: RoleType) => async (req: Request, re
     }
 
     res.locals.user = user;
+    res.locals.session = session;
     next();
   } catch (err) {
     next(err);
