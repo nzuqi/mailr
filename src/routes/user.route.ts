@@ -12,6 +12,9 @@ import {
   beginTwoFactorSetup,
   verifyTwoFactorSetup,
   disableTwoFactor,
+  changePassword,
+  requestPasswordReset,
+  resetPassword,
 } from '../controllers';
 import { authenticate, loginLimiter, sensitiveLimiter } from '../utils';
 
@@ -29,6 +32,12 @@ export const userRoutes = () => {
   router.post('/v1/2fa/disable', authenticate(), sensitiveLimiter, disableTwoFactor);
 
   router.post('/v1/signout', authenticate(), signoutUser);
+
+  router.post('/v1/password/change', authenticate(), sensitiveLimiter, changePassword);
+
+  router.post('/v1/password/forgot', sensitiveLimiter, requestPasswordReset);
+
+  router.post('/v1/password/reset', sensitiveLimiter, resetPassword);
 
   router.get('/v1/users', authenticate(['ADMIN']), getAllUsers);
 

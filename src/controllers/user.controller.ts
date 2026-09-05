@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
-import { Session, Setting, SettingInput, User, UserInput } from '../models';
+import nodemailer from 'nodemailer';
+import { Application, Session, Setting, SettingInput, User, UserInput } from '../models';
 import { TwoFactorService } from '../services';
 import {
   asyncHandler,
@@ -16,12 +18,16 @@ import {
   obscureEmail,
   responseHandler,
   buildQueryOptions,
+  logger,
 } from '../utils';
 
 const twoFactorService = new TwoFactorService();
 const twoFactorCodeRegex = /^\d{6}$/;
 const accessTokenDuration = '15m';
 const refreshTokenDuration = '7d';
+const passwordResetDuration = 30 * 60 * 1000;
+const validPassword = (password: unknown): password is string =>
+  typeof password === 'string' && password.length >= 8 && /[a-z]/.test(password) && /[A-Z]/.test(password) && /\d/.test(password);
 
 const issueTokens = (user: InstanceType<typeof User>, sessionId: string) => {
   const jwtSecret = process.env.JWT_SECRET || '';
@@ -328,6 +334,100 @@ export const refreshTokenUser = asyncHandler(async (req: Request, res: Response)
     },
     message: 'Token refreshed successfully',
   });
+});
+
+export const changePassword = asyncHandler(async (req: Request, res: Response) => {
+  const { currentPassword, newPassword } = req.body || {};
+  const { session, user } = res.locals;
+
+  if (typeof currentPassword !== 'string' || !validPassword(newPassword)) {
+    throw new HttpError(422, 'Current password and a valid new password are required.', ErrorCodes.VALIDATION);
+  }
+  if (!comparePassword(currentPassword, user.password)) {
+    throw new HttpError(403, 'Current password is incorrect.', ErrorCodes.NOT_ALLOWED);
+  }
+  if (comparePassword(newPassword, user.password)) {
+    throw new HttpError(422, 'New password must be different from the current password.', ErrorCodes.VALIDATION);
+  }
+
+  user.password = hashPassword(newPassword);
+  await Promise.all([
+    user.save(),
+    Session.updateMany({ user: user._id, _id: { $ne: session._id }, revokedAt: null }, { $set: { revokedAt: new Date() } }),
+  ]);
+
+  return res.status(200).json({ message: 'Password changed successfully.' });
+});
+
+export const requestPasswordReset = asyncHandler(async (req: Request, res: Response) => {
+  const { email } = req.body || {};
+
+  if (typeof email !== 'string' || !emailRegex.test(email)) {
+    throw new HttpError(422, 'A valid email address is required.', ErrorCodes.VALIDATION);
+  }
+
+  const user = await User.findOne({ email: email.toLowerCase(), enabled: true }).exec();
+
+  if (user) {
+    const token = crypto.randomBytes(32).toString('base64url');
+
+    user.passwordResetInfo = { tokenHash: hashToken(token), expires: Date.now() + passwordResetDuration };
+    await user.save();
+
+    try {
+      const application = await Application.findOne({ enabled: true, smtp: { $ne: null } })
+        .select('name smtp')
+        .exec();
+      const smtp = application?.smtp instanceof Map ? Object.fromEntries(application.smtp) : application?.smtp;
+
+      if (!smtp) {
+        throw new Error('No enabled application has SMTP configured');
+      }
+      const resetUrl = `${process.env.WEB_URL || 'http://localhost:4200'}/auth/reset-password?token=${encodeURIComponent(token)}`;
+      const transporter = nodemailer.createTransport({
+        host: smtp.host,
+        port: smtp.port || 587,
+        secure: smtp.port === 465 ? true : smtp.secure,
+        auth: { user: smtp.user, pass: smtp.password },
+      });
+
+      await transporter.sendMail({
+        from: `"${application?.name || 'Mailr'}" <${smtp.user}>`,
+        to: user.email,
+        subject: 'Reset your Mailr password',
+        text: `Reset your Mailr password using this link: ${resetUrl}. This link expires in 30 minutes.`,
+        html: `<p>Use the link below to reset your Mailr password. It expires in 30 minutes.</p><p><a href="${resetUrl}">Reset password</a></p>`,
+      });
+    } catch (error) {
+      logger.error(`Unable to deliver password reset email for user ${user._id}: ${(error as Error).message}`);
+    }
+  }
+
+  return res.status(200).json({ message: 'If an account matches that email, a reset link has been sent.' });
+});
+
+export const resetPassword = asyncHandler(async (req: Request, res: Response) => {
+  const { newPassword, token } = req.body || {};
+
+  if (typeof token !== 'string' || !token || !validPassword(newPassword)) {
+    throw new HttpError(422, 'A valid reset token and password are required.', ErrorCodes.VALIDATION);
+  }
+
+  const user = await User.findOne({
+    'passwordResetInfo.tokenHash': hashToken(token),
+    'passwordResetInfo.expires': { $gt: Date.now() },
+    enabled: true,
+  }).exec();
+
+  if (!user) {
+    throw new HttpError(400, 'This password reset link is invalid or has expired.', ErrorCodes.VALIDATION);
+  }
+
+  user.password = hashPassword(newPassword);
+  user.passwordResetInfo = null;
+  await Promise.all([user.save(), Session.updateMany({ user: user._id, revokedAt: null }, { $set: { revokedAt: new Date() } })]);
+
+  return res.status(200).json({ message: 'Password reset successfully.' });
 });
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
