@@ -57,32 +57,34 @@ export const getApplication = asyncHandler(async (req: Request, res: Response) =
     throw new HttpError(404, `Application with id '${id}' not found.`, ErrorCodes.NOT_FOUND);
   }
 
-  return responseHandler(res.status(200), { data: application }, [
-    'name',
-    'description',
-    'enabled',
-    'smtp.host',
-    'smtp.port',
-    'smtp.secure',
-    'smtp.user',
-    'createdAt',
-    'updatedAt',
-  ]);
+  const smtp = application.smtp instanceof Map ? Object.fromEntries(application.smtp) : application.smtp;
+  const safeSmtp = smtp ? { host: smtp.host, port: smtp.port, secure: smtp.secure, user: smtp.user } : null;
+
+  return responseHandler(res.status(200), {
+    data: {
+      _id: application._id,
+      name: application.name,
+      description: application.description,
+      enabled: application.enabled,
+      smtp: safeSmtp,
+      hasApiKey: Boolean(application.apiKeyHash || application.apiKey),
+      createdAt: application.get('createdAt'),
+      updatedAt: application.get('updatedAt'),
+    },
+  });
 });
 
 export const updateApplication = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params || {};
-  const { description, enabled } = req.body || {};
+  const { description, enabled, name } = req.body || {};
 
-  if ((description && typeof description !== 'string') || (enabled && typeof enabled !== 'boolean')) {
-    throw new HttpError(422, `You can only update using 'description' and 'enabled' fields`, ErrorCodes.VALIDATION);
+  if (!mongoose.isValidObjectId(id)) {
+    throw new HttpError(422, 'Application id must be valid.', ErrorCodes.VALIDATION);
   }
-
-  const updateData: { description: string; enabled?: boolean } = { description };
-
-  if (typeof enabled === 'boolean') {
-    updateData.enabled = enabled;
+  if (typeof name !== 'string' || !name.trim() || typeof description !== 'string' || typeof enabled !== 'boolean') {
+    throw new HttpError(422, 'Name, description and enabled status are required.', ErrorCodes.VALIDATION);
   }
+  const updateData = { name: name.trim(), description: description.trim(), enabled };
   const applicationUpdated = await Application.findByIdAndUpdate(id, updateData, { new: true, runValidators: true });
 
   if (!applicationUpdated) {
@@ -103,6 +105,10 @@ export const deleteApplication = asyncHandler(async (req: Request, res: Response
   const { id } = req.params; // single delete
   const { ids } = req.body || {}; // bulk delete
   const applicationIds = id ? [id] : Array.isArray(ids) ? ids : [];
+
+  if (id && !mongoose.isValidObjectId(id)) {
+    throw new HttpError(422, 'Application id must be valid.', ErrorCodes.VALIDATION);
+  }
 
   // Messages queued before SMTP snapshots were introduced still depend on the
   // application record. Preserve that record until the legacy queue drains.
@@ -141,6 +147,10 @@ export const deleteApplication = asyncHandler(async (req: Request, res: Response
 export const generateApplicationKey = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params || {};
 
+  if (!mongoose.isValidObjectId(id)) {
+    throw new HttpError(422, 'Application id must be valid.', ErrorCodes.VALIDATION);
+  }
+
   const apiKey = generateApiKey();
   const apiKeyHash = hashApiKey(apiKey);
 
@@ -162,6 +172,10 @@ export const generateApplicationKey = asyncHandler(async (req: Request, res: Res
 export const updateApplicationSmtp = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params || {};
   const { host, password, port, secure, user } = req.body || {};
+
+  if (!mongoose.isValidObjectId(id)) {
+    throw new HttpError(422, 'Application id must be valid.', ErrorCodes.VALIDATION);
+  }
 
   if (typeof host !== 'string' || typeof port !== 'number' || typeof user !== 'string' || typeof password !== 'string') {
     throw new HttpError(422, 'Host, port, user and password are required and must be valid.', ErrorCodes.VALIDATION);
