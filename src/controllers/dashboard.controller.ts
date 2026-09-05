@@ -42,10 +42,18 @@ export const getDashboard = asyncHandler(async (req: Request, res: Response) => 
     User.countDocuments(),
     User.countDocuments({ enabled: true }),
     Message.aggregate<{ _id: number; count: number }>([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
-    Message.aggregate<{ _id: string; count: number }>([
+    Message.aggregate<{ _id: { date: string; status: number }; count: number }>([
       { $match: reportFilter },
-      { $group: { _id: { $dateToString: { date: '$createdAt', format: '%Y-%m-%d', timezone: 'UTC' } }, count: { $sum: 1 } } },
-      { $sort: { _id: 1 } },
+      {
+        $group: {
+          _id: {
+            date: { $dateToString: { date: '$createdAt', format: '%Y-%m-%d', timezone: 'UTC' } },
+            status: '$status',
+          },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { '_id.date': 1 } },
     ]),
     Message.find().sort({ createdAt: -1 }).limit(5).select('from subject application status createdAt').lean().exec(),
   ]);
@@ -55,14 +63,19 @@ export const getDashboard = asyncHandler(async (req: Request, res: Response) => 
   const sent = byStatus.get(1) ?? 0;
   const failed = byStatus.get(2) ?? 0;
   const messages = queued + sent + failed;
-  const seriesMap = new Map(deliverySeries.map((item) => [item._id, item.count]));
+  const seriesMap = new Map(deliverySeries.map((item) => [`${item._id.date}:${item._id.status}`, item.count]));
   const series = Array.from({ length: days }, (_, index) => {
     const date = new Date(start);
 
     date.setUTCDate(start.getUTCDate() + index);
     const day = date.toISOString().slice(0, 10);
 
-    return { date: day, count: seriesMap.get(day) ?? 0 };
+    return {
+      date: day,
+      queued: seriesMap.get(`${day}:0`) ?? 0,
+      sent: seriesMap.get(`${day}:1`) ?? 0,
+      failed: seriesMap.get(`${day}:2`) ?? 0,
+    };
   });
 
   return responseHandler(res.status(200), {
