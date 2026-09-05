@@ -7,8 +7,15 @@ export const createApplication = asyncHandler(async (req: Request, res: Response
   const { description, name } = req.body || {};
   const user: UserDocument = res.locals.user || {};
 
-  if (typeof name !== 'string' || typeof description !== 'string') {
-    throw new HttpError(422, 'Name, description, and user are required and must be valid.', ErrorCodes.VALIDATION);
+  if (
+    typeof name !== 'string' ||
+    name.trim().length < 2 ||
+    name.trim().length > 80 ||
+    typeof description !== 'string' ||
+    description.trim().length < 1 ||
+    description.trim().length > 500
+  ) {
+    throw new HttpError(422, 'Name must be 2–80 characters and description must be 1–500 characters.', ErrorCodes.VALIDATION);
   }
 
   const applicationInput: ApplicationInput = {
@@ -81,8 +88,16 @@ export const updateApplication = asyncHandler(async (req: Request, res: Response
   if (!mongoose.isValidObjectId(id)) {
     throw new HttpError(422, 'Application id must be valid.', ErrorCodes.VALIDATION);
   }
-  if (typeof name !== 'string' || !name.trim() || typeof description !== 'string' || typeof enabled !== 'boolean') {
-    throw new HttpError(422, 'Name, description and enabled status are required.', ErrorCodes.VALIDATION);
+  if (
+    typeof name !== 'string' ||
+    name.trim().length < 2 ||
+    name.trim().length > 80 ||
+    typeof description !== 'string' ||
+    description.trim().length < 1 ||
+    description.trim().length > 500 ||
+    typeof enabled !== 'boolean'
+  ) {
+    throw new HttpError(422, 'Name must be 2–80 characters, description 1–500 characters, and enabled must be boolean.', ErrorCodes.VALIDATION);
   }
   const updateData = { name: name.trim(), description: description.trim(), enabled };
   const applicationUpdated = await Application.findByIdAndUpdate(id, updateData, { new: true, runValidators: true });
@@ -177,11 +192,26 @@ export const updateApplicationSmtp = asyncHandler(async (req: Request, res: Resp
     throw new HttpError(422, 'Application id must be valid.', ErrorCodes.VALIDATION);
   }
 
-  if (typeof host !== 'string' || typeof port !== 'number' || typeof user !== 'string' || typeof password !== 'string') {
+  if (
+    typeof host !== 'string' ||
+    !host.trim() ||
+    host.trim().length > 255 ||
+    typeof port !== 'number' ||
+    !Number.isInteger(port) ||
+    port < 1 ||
+    port > 65535 ||
+    typeof secure !== 'boolean' ||
+    typeof user !== 'string' ||
+    !user.trim() ||
+    user.trim().length > 255 ||
+    typeof password !== 'string' ||
+    !password ||
+    password.length > 500
+  ) {
     throw new HttpError(422, 'Host, port, user and password are required and must be valid.', ErrorCodes.VALIDATION);
   }
 
-  const smtp: SmtpData = { host, port, secure: typeof secure === 'boolean' ? secure : false, user, password };
+  const smtp: SmtpData = { host: host.trim(), port, secure, user: user.trim(), password };
   const applicationUpdated = await Application.findByIdAndUpdate(id, { smtp }, { new: true, runValidators: true });
 
   if (!applicationUpdated) {

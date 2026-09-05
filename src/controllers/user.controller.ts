@@ -27,7 +27,12 @@ const accessTokenDuration = '15m';
 const refreshTokenDuration = '7d';
 const passwordResetDuration = 30 * 60 * 1000;
 const validPassword = (password: unknown): password is string =>
-  typeof password === 'string' && password.length >= 8 && /[a-z]/.test(password) && /[A-Z]/.test(password) && /\d/.test(password);
+  typeof password === 'string' &&
+  password.length >= 8 &&
+  password.length <= 128 &&
+  /[a-z]/.test(password) &&
+  /[A-Z]/.test(password) &&
+  /\d/.test(password);
 
 const issueTokens = (user: InstanceType<typeof User>, sessionId: string) => {
   const jwtSecret = process.env.JWT_SECRET || '';
@@ -64,15 +69,23 @@ export const registerUser = asyncHandler(async (req: Request, res: Response) => 
 
   if (
     typeof firstName !== 'string' ||
+    !firstName.trim() ||
+    firstName.trim().length > 80 ||
     typeof lastName !== 'string' ||
+    !lastName.trim() ||
+    lastName.trim().length > 80 ||
     typeof email !== 'string' ||
-    typeof password !== 'string' ||
-    typeof role !== 'string'
+    email.trim().length > 254 ||
+    !validPassword(password) ||
+    typeof role !== 'string' ||
+    !role.trim()
   ) {
     throw new HttpError(422, 'The fields email, firstName, firstName, password and role are required', ErrorCodes.VALIDATION);
   }
 
-  if (!emailRegex.test(email)) {
+  const normalizedEmail = email.trim().toLowerCase();
+
+  if (!emailRegex.test(normalizedEmail)) {
     throw new HttpError(422, 'Invalid email format', ErrorCodes.VALIDATION);
   }
 
@@ -81,8 +94,8 @@ export const registerUser = asyncHandler(async (req: Request, res: Response) => 
   const expires = current.getTime() + 86400000; // + 1 day in ms
 
   const userInput: UserInput = {
-    name: `${capitalizeFirstLetter(firstName)} ${capitalizeFirstLetter(lastName)}`,
-    email: email.toLowerCase(),
+    name: `${capitalizeFirstLetter(firstName.trim())} ${capitalizeFirstLetter(lastName.trim())}`,
+    email: normalizedEmail,
     password: hashPassword(password),
     role,
     verificationInfo: {
@@ -135,15 +148,17 @@ export const getUser = asyncHandler(async (req: Request, res: Response) => {
 export const signinUser = asyncHandler(async (req: Request, res: Response) => {
   const { code, email, password } = req.body || {};
 
-  if (typeof email !== 'string' || typeof password !== 'string') {
+  if (typeof email !== 'string' || email.trim().length > 254 || typeof password !== 'string' || !password || password.length > 128) {
     throw new HttpError(422, 'Email and password are required', ErrorCodes.VALIDATION);
   }
 
-  if (!emailRegex.test(email)) {
+  const normalizedEmail = email.trim().toLowerCase();
+
+  if (!emailRegex.test(normalizedEmail)) {
     throw new HttpError(422, 'Invalid email format', ErrorCodes.VALIDATION);
   }
 
-  const user = await User.findOne({ email: email.toLowerCase() }).exec();
+  const user = await User.findOne({ email: normalizedEmail }).exec();
 
   if (!user) {
     // throw new HttpError(404, 'User not found', ErrorCodes.NOT_FOUND);
@@ -340,7 +355,7 @@ export const changePassword = asyncHandler(async (req: Request, res: Response) =
   const { currentPassword, newPassword } = req.body || {};
   const { session, user } = res.locals;
 
-  if (typeof currentPassword !== 'string' || !validPassword(newPassword)) {
+  if (typeof currentPassword !== 'string' || !currentPassword || currentPassword.length > 128 || !validPassword(newPassword)) {
     throw new HttpError(422, 'Current password and a valid new password are required.', ErrorCodes.VALIDATION);
   }
   if (!comparePassword(currentPassword, user.password)) {
@@ -362,11 +377,13 @@ export const changePassword = asyncHandler(async (req: Request, res: Response) =
 export const requestPasswordReset = asyncHandler(async (req: Request, res: Response) => {
   const { email } = req.body || {};
 
-  if (typeof email !== 'string' || !emailRegex.test(email)) {
+  const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+
+  if (!normalizedEmail || normalizedEmail.length > 254 || !emailRegex.test(normalizedEmail)) {
     throw new HttpError(422, 'A valid email address is required.', ErrorCodes.VALIDATION);
   }
 
-  const user = await User.findOne({ email: email.toLowerCase(), enabled: true }).exec();
+  const user = await User.findOne({ email: normalizedEmail, enabled: true }).exec();
 
   if (user) {
     const token = crypto.randomBytes(32).toString('base64url');
@@ -409,7 +426,7 @@ export const requestPasswordReset = asyncHandler(async (req: Request, res: Respo
 export const resetPassword = asyncHandler(async (req: Request, res: Response) => {
   const { newPassword, token } = req.body || {};
 
-  if (typeof token !== 'string' || !token || !validPassword(newPassword)) {
+  if (typeof token !== 'string' || !token || token.length > 256 || !validPassword(newPassword)) {
     throw new HttpError(422, 'A valid reset token and password are required.', ErrorCodes.VALIDATION);
   }
 
