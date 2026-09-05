@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import mongoose from 'mongoose';
 import { Application, Attachment, Message, MessageInput, SmtpData, UserDocument } from '../models';
 import { asyncHandler, buildQueryOptions, emailRegex, ErrorCodes, hashApiKey, HttpError, logger, responseHandler } from '../utils';
 
@@ -120,8 +121,24 @@ export const getAllMessages = asyncHandler(async (req: Request, res: Response) =
       data,
       message: 'Successful',
     },
-    ['from', 'subject', 'createdAt', 'updatedAt', 'application'],
+    ['from', 'subject', 'createdAt', 'sentAt', 'status'],
   );
+});
+
+export const getMessage = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  if (!mongoose.isValidObjectId(id)) {
+    throw new HttpError(422, 'Message id must be valid.', ErrorCodes.VALIDATION);
+  }
+
+  const message = await Message.findById(id).select('from to subject message status urgent sentAt createdAt attachments error').lean().exec();
+
+  if (!message) {
+    throw new HttpError(404, `Message with id '${id}' not found.`, ErrorCodes.NOT_FOUND);
+  }
+
+  return responseHandler(res.status(200), { data: message, message: 'Successful' });
 });
 
 export const getMessageAttribution = asyncHandler(async (req: Request, res: Response) => {
