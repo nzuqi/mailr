@@ -9,15 +9,24 @@ import {
   verifyEmailUser,
   resendVerificationUser,
   refreshTokenUser,
+  beginTwoFactorSetup,
+  verifyTwoFactorSetup,
+  disableTwoFactor,
 } from '../controllers';
-import { authenticate } from '../utils';
+import { authenticate, loginLimiter, sensitiveLimiter } from '../utils';
 
 export const userRoutes = () => {
   const router = Router();
 
   router.post('/v1/register', registerUser);
 
-  router.post('/v1/signin', signinUser);
+  router.post('/v1/signin', loginLimiter, signinUser);
+
+  router.post('/v1/2fa/enable', authenticate(), sensitiveLimiter, beginTwoFactorSetup);
+
+  router.post('/v1/2fa/verify', authenticate(), sensitiveLimiter, verifyTwoFactorSetup);
+
+  router.post('/v1/2fa/disable', authenticate(), sensitiveLimiter, disableTwoFactor);
 
   router.post('/v1/signout', authenticate(), signoutUser);
 

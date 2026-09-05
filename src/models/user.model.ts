@@ -10,6 +10,8 @@ type UserDocument = Document & {
   refreshToken?: string | null;
   passwordResetInfo?: Record<string, string | number | boolean> | null;
   enabled?: boolean;
+  twoFactorEnabled?: boolean;
+  twoFactorSecret?: string | null;
   role: string;
 };
 
@@ -59,6 +61,15 @@ const usersSchema = new Schema(
     enabled: {
       type: Schema.Types.Boolean,
       default: true,
+    },
+    twoFactorEnabled: {
+      type: Schema.Types.Boolean,
+      default: false,
+    },
+    twoFactorSecret: {
+      type: Schema.Types.String,
+      default: null,
+      select: false,
     },
     role: {
       type: Schema.Types.ObjectId,

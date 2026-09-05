@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { Setting, SettingInput, User, UserInput } from '../models';
+import { TwoFactorService } from '../services';
 import {
   asyncHandler,
   capitalizeFirstLetter,
@@ -15,6 +16,9 @@ import {
   responseHandler,
   buildQueryOptions,
 } from '../utils';
+
+const twoFactorService = new TwoFactorService();
+const twoFactorCodeRegex = /^\d{6}$/;
 
 export const registerUser = asyncHandler(async (req: Request, res: Response) => {
   const setting: SettingInput | null = await Setting.findOne({ key: 'app' });
@@ -100,7 +104,7 @@ export const getUser = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const signinUser = asyncHandler(async (req: Request, res: Response) => {
-  const { email, password } = req.body || {};
+  const { code, email, password } = req.body || {};
 
   if (typeof email !== 'string' || typeof password !== 'string') {
     throw new HttpError(422, 'Email and password are required', ErrorCodes.VALIDATION);
@@ -131,6 +135,16 @@ export const signinUser = asyncHandler(async (req: Request, res: Response) => {
     throw new HttpError(401, 'Invalid credentials', ErrorCodes.UNAUTHORIZED);
   }
 
+  if (user.twoFactorEnabled) {
+    if (typeof code !== 'string' || !twoFactorCodeRegex.test(code)) {
+      throw new HttpError(428, 'Enter the 6-digit code from your authenticator app', ErrorCodes.TWO_FA);
+    }
+
+    if (!(await twoFactorService.verifyCode(user._id.toString(), code))) {
+      throw new HttpError(401, 'Invalid two-factor authentication code', ErrorCodes.UNAUTHORIZED);
+    }
+  }
+
   const jwtSecret = process.env.JWT_SECRET || '';
   const accessToken = jwt.sign({ id: user._id, role: user.role }, jwtSecret, { expiresIn: '1h' });
   const refreshToken = jwt.sign({ id: user._id, role: user.role }, jwtSecret, { expiresIn: '7d' });
@@ -148,9 +162,58 @@ export const signinUser = asyncHandler(async (req: Request, res: Response) => {
       email: obscureEmail(user.email),
       name: user.name,
       role: user.role,
+      twoFactorEnabled: Boolean(user.twoFactorEnabled),
     },
     message: 'Signed in successfully',
   });
+});
+
+export const beginTwoFactorSetup = asyncHandler(async (_req: Request, res: Response) => {
+  const { user } = res.locals;
+
+  if (user.twoFactorEnabled) {
+    throw new HttpError(409, 'Two-factor authentication is already enabled', ErrorCodes.NOT_ALLOWED);
+  }
+
+  const setup = await twoFactorService.generateSecret(user._id.toString(), user.email);
+
+  return responseHandler(res.status(200), { data: setup, message: 'Two-factor setup started' });
+});
+
+export const verifyTwoFactorSetup = asyncHandler(async (req: Request, res: Response) => {
+  const { code } = req.body || {};
+  const { user } = res.locals;
+
+  if (typeof code !== 'string' || !twoFactorCodeRegex.test(code)) {
+    throw new HttpError(422, 'A valid 6-digit code is required', ErrorCodes.VALIDATION);
+  }
+
+  if (!(await twoFactorService.verifyCode(user._id.toString(), code))) {
+    throw new HttpError(403, 'Invalid two-factor authentication code', ErrorCodes.NOT_ALLOWED);
+  }
+
+  await twoFactorService.enable(user._id.toString());
+  return res.status(200).json({ message: 'Two-factor authentication enabled' });
+});
+
+export const disableTwoFactor = asyncHandler(async (req: Request, res: Response) => {
+  const { code } = req.body || {};
+  const { user } = res.locals;
+
+  if (!user.twoFactorEnabled) {
+    throw new HttpError(409, 'Two-factor authentication is not enabled', ErrorCodes.NOT_ALLOWED);
+  }
+
+  if (typeof code !== 'string' || !twoFactorCodeRegex.test(code)) {
+    throw new HttpError(422, 'A valid 6-digit code is required', ErrorCodes.VALIDATION);
+  }
+
+  if (!(await twoFactorService.verifyCode(user._id.toString(), code))) {
+    throw new HttpError(403, 'Invalid two-factor authentication code', ErrorCodes.NOT_ALLOWED);
+  }
+
+  await twoFactorService.disable(user._id.toString());
+  return res.status(200).json({ message: 'Two-factor authentication disabled' });
 });
 
 export const signoutUser = asyncHandler(async (req: Request, res: Response) => {
@@ -216,6 +279,7 @@ export const refreshTokenUser = asyncHandler(async (req: Request, res: Response)
       email: user.email,
       name: user.name,
       role: user.role,
+      twoFactorEnabled: Boolean(user.twoFactorEnabled),
     },
     message: 'Token refreshed successfully',
   });
